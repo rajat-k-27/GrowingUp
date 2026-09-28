@@ -1,0 +1,26 @@
+{
+  "chats": [
+    {
+      "id": 1790498745935,
+      "sender": "BRO",
+      "text": "uuuh"
+    }
+  ],
+  "achievements": [
+    {
+      "id": "CUSTOM_1790498800658",
+      "title": "GIRLFRIEND",
+      "desc": "imaginary",
+      "unlocked": true,
+      "unlockedBy": "BRO"
+    },
+    {
+      "id": "CUSTOM_1790498939451",
+      "title": "GF",
+      "desc": "imaginary",
+      "unlocked": true,
+      "unlockedBy": "RAJAT"
+    }
+  ],
+  "drops": []
+}
