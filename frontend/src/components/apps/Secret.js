@@ -70,7 +70,7 @@ export default function Secret({ onClose, identity }) {
   if (unlocked) {
     return (
       <Window title="SECRET.exe - UNLOCKED" onClose={onClose} icon={Unlock} width="max-w-2xl">
-        <div className="flex flex-col h-[60vh] font-mono">
+        <div className="flex flex-col h-full font-mono">
           <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-red-950/20 text-red-500">
             <span className="font-bold tracking-widest text-xs">CLASSIFIED COMM CHANNEL [ {currentPin} ]</span>
             <Eye size={16} />

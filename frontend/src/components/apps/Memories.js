@@ -5,12 +5,14 @@ import { Camera, Image as ImageIcon, Send, Clock, Calendar } from "lucide-react"
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSocket } from "../SocketProvider";
+import ImageViewer from "../ImageViewer";
 
 export default function Memories({ onClose, identity }) {
   const { socket } = useSocket();
   const [memories, setMemories] = useState([]);
   const [desc, setDesc] = useState("");
   const [imageStr, setImageStr] = useState(null);
+  const [expandedImage, setExpandedImage] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -55,7 +57,28 @@ export default function Memories({ onClose, identity }) {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      setImageStr(event.target.result);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Compress heavily to prevent Socket.IO and UI lag
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        setImageStr(compressedBase64);
+      };
+      img.src = event.target.result;
     };
     reader.readAsDataURL(file);
   };
@@ -86,7 +109,7 @@ export default function Memories({ onClose, identity }) {
 
   return (
     <Window title="MEMORIES.exe" onClose={onClose} icon={Camera} width="max-w-2xl">
-      <div className="flex flex-col h-[70vh] font-sans">
+      <div className="flex flex-col h-full font-sans">
         
         {/* Memory Feed */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -104,7 +127,13 @@ export default function Memories({ onClose, identity }) {
             >
               {mem.image && (
                 <div className="w-full bg-black/60 border-b border-gray-900 flex justify-center p-2">
-                  <img src={mem.image} alt="Memory" className="max-h-64 object-contain rounded" />
+                  <img 
+                    src={mem.image} 
+                    alt="Memory" 
+                    className="max-h-64 object-contain rounded cursor-pointer hover:opacity-90 transition-opacity" 
+                    loading="lazy" 
+                    onClick={() => setExpandedImage(mem.image)}
+                  />
                 </div>
               )}
               <div className="p-4">
@@ -157,7 +186,7 @@ export default function Memories({ onClose, identity }) {
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               placeholder="Describe this memory..."
-              className="flex-1 bg-black border border-gray-800 rounded px-4 py-2 text-sm focus:outline-none focus:border-purple-500 text-gray-300"
+              className="flex-1 min-w-0 bg-black border border-gray-800 rounded px-4 py-2 text-sm focus:outline-none focus:border-purple-500 text-gray-300"
             />
             <button 
               type="submit" 
@@ -169,6 +198,9 @@ export default function Memories({ onClose, identity }) {
           </form>
         </div>
       </div>
+      {expandedImage && (
+        <ImageViewer src={expandedImage} onClose={() => setExpandedImage(null)} />
+      )}
     </Window>
   );
 }

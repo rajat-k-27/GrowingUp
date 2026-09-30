@@ -1,46 +1,56 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
-import { useSocket } from "./SocketProvider";
+import { useState } from "react";
 
 export default function IdentitySelector({ onLogin }) {
-  const { socket } = useSocket();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (!socket) return;
-    
-    socket.on("loginSuccess", (user) => {
-      onLogin(user);
-    });
-
-    socket.on("loginError", (msg) => {
-      setError(msg);
-      setTimeout(() => setError(null), 3000);
-    });
-
-    return () => {
-      socket.off("loginSuccess");
-      socket.off("loginError");
-    };
-  }, [socket, onLogin]);
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
     if (!username.trim() || !password.trim()) {
       setError("Fields cannot be empty");
       setTimeout(() => setError(null), 2000);
       return;
     }
     
-    if (isLogin) {
-      socket.emit("login", { username: username.trim().toUpperCase(), password });
-    } else {
-      socket.emit("register", { username: username.trim().toUpperCase(), password });
+    setIsLoading(true);
+    setError("AUTHENTICATING...");
+
+    try {
+      const defaultBackend = typeof window !== 'undefined' 
+        ? `${window.location.protocol}//${window.location.hostname}:5000` 
+        : "http://localhost:5000";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || defaultBackend;
+      
+      const endpoint = isLogin ? "/api/login" : "/api/register";
+      const res = await fetch(`${backendUrl}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: username.trim().toUpperCase(), 
+          password 
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        onLogin(data);
+      } else {
+        setError(data.error || "Authentication failed");
+        setTimeout(() => setError(null), 3000);
+      }
+    } catch (err) {
+      setError("NETWORK ERROR. SERVER OFFLINE.");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -84,6 +94,7 @@ export default function IdentitySelector({ onLogin }) {
               onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-black border border-gray-700 p-4 text-center tracking-[0.5em] focus:outline-none focus:border-blue-500 uppercase"
               autoFocus
+              disabled={isLoading}
             />
           </div>
           
@@ -95,14 +106,29 @@ export default function IdentitySelector({ onLogin }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-black border border-gray-700 p-4 text-center tracking-[1em] focus:outline-none focus:border-blue-500"
+              disabled={isLoading}
             />
           </div>
 
-          <button type="submit" className="w-full bg-blue-900/20 border border-blue-500/50 p-4 hover:bg-blue-800/30 text-blue-500 tracking-widest font-bold transition-all mt-2">
-            {isLogin ? "AUTHENTICATE" : "CREATE ACCOUNT"}
+          <div className="h-4 flex items-center justify-center">
+            {error && (
+              <motion.span 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className={`text-xs tracking-widest ${error.includes('NETWORK') || error.includes('failed') || error.includes('empty') || error.includes('Invalid') || error.includes('taken') ? 'text-red-500' : 'text-blue-400'}`}
+              >
+                {error}
+              </motion.span>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold tracking-[0.2em] py-4 rounded transition-colors shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+          >
+            {isLogin ? 'AUTHENTICATE' : 'INITIALIZE'}
           </button>
-          
-          {error && <div className="text-red-500 text-xs animate-pulse text-center mt-2 border border-red-900 bg-red-950/20 p-2">{error}</div>}
         </form>
       </motion.div>
       </div>

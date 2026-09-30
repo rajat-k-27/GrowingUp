@@ -4,6 +4,8 @@ import Window from "../Window";
 import { MessageSquare, Send, Paperclip, X, Mic, Square } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSocket } from "../SocketProvider";
+import AudioPlayer from "../AudioPlayer";
+import ImageViewer from "../ImageViewer";
 
 export default function Chat({ onClose, identity }) {
   const { socket } = useSocket();
@@ -14,6 +16,7 @@ export default function Chat({ onClose, identity }) {
   const [input, setInput] = useState("");
   const [mediaBase64, setMediaBase64] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [expandedImage, setExpandedImage] = useState(null);
   const endRef = useRef(null);
   const fileInputRef = useRef(null);
   
@@ -143,7 +146,7 @@ export default function Chat({ onClose, identity }) {
 
   return (
     <Window title="SECURE_CHAT.exe" onClose={onClose} icon={MessageSquare}>
-      <div className="flex flex-col h-[65vh] font-sans">
+      <div className="flex flex-col h-full font-sans">
         <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 pb-4 hide-scrollbar">
           {messages.map((msg, idx) => (
             <div key={msg._id || msg.id || idx} className={`flex flex-col ${msg.sender === identity ? "items-end" : msg.sender === "SYSTEM" ? "items-center" : "items-start"}`}>
@@ -158,9 +161,15 @@ export default function Chat({ onClose, identity }) {
                 {msg.mediaUrl && (
                   <div className="mb-2">
                     {msg.mediaType === "video" || msg.mediaType === "audio" || msg.mediaUrl.endsWith(".webm") || msg.mediaUrl.endsWith(".mp4") ? (
-                      <audio src={msg.mediaUrl} controls className="max-w-[200px] sm:max-w-xs h-10 rounded" />
+                      <AudioPlayer src={msg.mediaUrl} />
                     ) : (
-                      <img src={msg.mediaUrl} alt="attachment" className="rounded-xl max-w-full sm:max-w-xs max-h-64 object-cover border border-white/10" />
+                      <img 
+                        src={msg.mediaUrl} 
+                        alt="attachment" 
+                        className="rounded-xl max-w-full sm:max-w-xs max-h-64 object-cover border border-white/10 cursor-pointer hover:opacity-90 transition-opacity" 
+                        loading="lazy" 
+                        onClick={() => setExpandedImage(msg.mediaUrl)}
+                      />
                     )}
                   </div>
                 )}
@@ -244,6 +253,9 @@ export default function Chat({ onClose, identity }) {
           )}
         </form>
       </div>
+      {expandedImage && (
+        <ImageViewer src={expandedImage} onClose={() => setExpandedImage(null)} />
+      )}
     </Window>
   );
 }

@@ -122,7 +122,7 @@ export default function Achievements({ onClose, identity }) {
 
   return (
     <Window title="ACHIEVEMENTS.exe" onClose={onClose} icon={Trophy}>
-      <div className="flex flex-col h-[60vh] font-mono">
+      <div className="flex flex-col h-full font-mono">
         <div className="flex justify-between items-end border-b border-yellow-900/50 pb-2 mb-2">
           <h2 className="text-yellow-500 font-bold tracking-widest text-lg">TROPHY ROOM</h2>
           <span className="text-yellow-600 text-xs">UNLOCKED: {unlockedCount}/{achievements.length}</span>

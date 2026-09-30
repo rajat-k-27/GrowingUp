@@ -5,7 +5,7 @@ import { Terminal, Shield, Zap, Globe, Cpu } from "lucide-react";
 
 export default function Landing({ onEnter }) {
   return (
-    <div className="fixed inset-0 bg-black text-white font-mono p-6 z-50 flex flex-col items-center justify-center h-full overflow-y-auto">
+    <div className="fixed inset-0 bg-black text-white font-mono p-4 sm:p-6 z-50 flex flex-col items-center overflow-y-auto">
       <div className="bg-grid" />
       <div className="crt-noise" />
       
@@ -13,7 +13,7 @@ export default function Landing({ onEnter }) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1 }}
-        className="max-w-4xl w-full flex flex-col items-center gap-12 relative z-10 py-12"
+        className="max-w-4xl w-full flex flex-col items-center relative z-10 py-12 my-auto"
       >
         <div className="text-center relative">
           <div className="absolute inset-0 bg-blue-500 blur-3xl opacity-20 rounded-full animate-pulse"></div>
@@ -42,6 +42,16 @@ export default function Landing({ onEnter }) {
             A PRIVATE KERNEL FOR SECURE PEER-TO-PEER CONNECTIONS
           </motion.p>
         </div>
+
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          onClick={onEnter}
+          className="mt-4 mb-8 bg-blue-900/20 border border-blue-500/50 px-12 py-5 text-blue-400 font-bold tracking-[0.2em] hover:bg-blue-600/30 transition-all hover:scale-105"
+        >
+          INITIALIZE SYSTEM
+        </motion.button>
 
         <motion.div 
           initial={{ opacity: 0 }}
@@ -73,16 +83,6 @@ export default function Landing({ onEnter }) {
             <p className="text-sm text-gray-500 leading-relaxed">Immersive futuristic interface featuring draggable windows, CRT distortions, and premium glassmorphism.</p>
           </div>
         </motion.div>
-
-        <motion.button
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          onClick={onEnter}
-          className="mt-8 bg-blue-900/20 border border-blue-500/50 px-12 py-5 text-blue-400 font-bold tracking-[0.2em] hover:bg-blue-600/30 transition-all hover:scale-105"
-        >
-          INITIALIZE SYSTEM
-        </motion.button>
 
       </motion.div>
     </div>
