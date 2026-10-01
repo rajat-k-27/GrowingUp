@@ -3,8 +3,24 @@
 import { useEffect, useState } from "react";
 import { useSocket } from "./SocketProvider";
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { X, Trash2 } from "lucide-react";
 import AudioPlayer from "./AudioPlayer";
+import ConfirmModal from "./ConfirmModal";
+
+export function getRelativeTime(dateInput) {
+  if (!dateInput) return "";
+  const date = new Date(dateInput);
+  const now = new Date();
+  const seconds = Math.floor((now - date) / 1000);
+  
+  if (seconds < 60) return `Just now`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days > 1 ? 's' : ''} ago`;
+}
 
 export default function BroWall({ identity }) {
   const { socket } = useSocket();
@@ -12,6 +28,7 @@ export default function BroWall({ identity }) {
     { id: 1, text: "System initialized.", time: new Date().toLocaleTimeString(), sender: "SYSTEM", type: "system" }
   ]);
   const [selectedMedia, setSelectedMedia] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   useEffect(() => {
     if (!socket) return;
@@ -24,23 +41,28 @@ export default function BroWall({ identity }) {
         id: item._id,
         text: item.text,
         time: item.time,
+        createdAt: item.createdAt,
         sender: item.sender,
         type: item.type,
         mediaUrl: item.mediaUrl,
         mediaType: item.mediaType
       }));
-      setActivities([...mapped, { id: "init", text: "System initialized.", time: new Date().toLocaleTimeString(), sender: "SYSTEM", type: "system" }]);
+      setActivities([...mapped, { id: "init", text: "System initialized.", time: new Date().toLocaleTimeString(), createdAt: new Date(), sender: "SYSTEM", type: "system" }]);
     });
 
-    const addActivity = (text, sender, type, mediaUrl = null, mediaType = null) => {
+    const addActivity = (text, sender, type, mediaUrl = null, mediaType = null, id = null, createdAt = null) => {
       setActivities(prev => [{
-        id: Date.now(), text, time: new Date().toLocaleTimeString(), sender, type, mediaUrl, mediaType
+        id: id || Date.now(), text, time: new Date().toLocaleTimeString(), createdAt: createdAt || new Date(), sender, type, mediaUrl, mediaType
       }, ...prev].slice(0, 50));
     };
 
     socket.on("newDrop", (data) => {
       const displayContent = data.content ? `: "${data.content}"` : "";
-      addActivity(`Dropped a ${data.type.toLowerCase()}${displayContent}`, data.identity, "drop", data.mediaUrl, data.mediaType);
+      addActivity(`Dropped a ${data.type.toLowerCase()}${displayContent}`, data.sender || data.identity, "drop", data.mediaUrl, data.mediaType, data._id, data.createdAt);
+    });
+
+    socket.on("dropDeleted", (id) => {
+      setActivities(prev => prev.filter(a => a.id !== id));
     });
 
     socket.on("newPing", (data) => {
@@ -58,6 +80,7 @@ export default function BroWall({ identity }) {
     return () => {
       socket.off("activityHistory");
       socket.off("newDrop");
+      socket.off("dropDeleted");
       socket.off("newPing");
       socket.off("hereUpdate");
       socket.off("statusUpdate");
@@ -80,8 +103,19 @@ export default function BroWall({ identity }) {
                 <div className="mt-1">
                   {act.sender === "RAJAT" ? "👑" : act.sender === "BRO" ? "🇯🇵" : "⚙️"}
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-300 text-xs">{act.sender} <span className="text-gray-600 font-normal">{act.time}</span></span>
+                <div className="flex flex-col flex-1">
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-bold text-gray-300 text-xs">
+                      {act.sender} <span className="text-gray-600 font-normal ml-1">
+                        {act.createdAt ? getRelativeTime(act.createdAt) : act.time} {act.createdAt ? `(${act.time})` : ''}
+                      </span>
+                    </span>
+                    {act.sender === identity && act.type === "drop" && (
+                      <button onClick={() => setDeleteConfirmId(act.id)} className="text-gray-700 hover:text-red-500 transition-colors ml-2">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                   <span className={`
                     ${act.type === 'ping' ? 'text-red-400' : ''}
                     ${act.type === 'drop' ? 'text-blue-400' : ''}
@@ -104,6 +138,18 @@ export default function BroWall({ identity }) {
           </AnimatePresence>
         </div>
       </div>
+
+      <ConfirmModal 
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => {
+          if (socket && deleteConfirmId) {
+            socket.emit("deleteDrop", deleteConfirmId);
+          }
+        }}
+        title="DELETE DROP"
+        message="Are you sure you want to delete this drop? It will be permanently removed for everyone."
+      />
 
       <AnimatePresence>
         {selectedMedia && (

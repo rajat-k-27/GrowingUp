@@ -2,25 +2,23 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function IdentitySelector({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!username.trim() || !password.trim()) {
-      setError("Fields cannot be empty");
-      setTimeout(() => setError(null), 2000);
+      toast.error("FIELDS CANNOT BE EMPTY");
       return;
     }
     
     setIsLoading(true);
-    setError("AUTHENTICATING...");
 
     try {
       const defaultBackend = typeof window !== 'undefined' 
@@ -41,14 +39,13 @@ export default function IdentitySelector({ onLogin }) {
       const data = await res.json();
 
       if (res.ok) {
+        toast.success(isLogin ? "AUTHENTICATED" : "REGISTERED");
         onLogin(data);
       } else {
-        setError(data.error || "Authentication failed");
-        setTimeout(() => setError(null), 3000);
+        toast.error(data.error || "AUTHENTICATION FAILED");
       }
     } catch (err) {
-      setError("NETWORK ERROR. SERVER OFFLINE.");
-      setTimeout(() => setError(null), 3000);
+      toast.error("NETWORK ERROR. SERVER OFFLINE.");
     } finally {
       setIsLoading(false);
     }
@@ -108,18 +105,6 @@ export default function IdentitySelector({ onLogin }) {
               className="w-full bg-black border border-gray-700 p-4 text-center tracking-[1em] focus:outline-none focus:border-blue-500"
               disabled={isLoading}
             />
-          </div>
-
-          <div className="h-4 flex items-center justify-center">
-            {error && (
-              <motion.span 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className={`text-xs tracking-widest ${error.includes('NETWORK') || error.includes('failed') || error.includes('empty') || error.includes('Invalid') || error.includes('taken') ? 'text-red-500' : 'text-blue-400'}`}
-              >
-                {error}
-              </motion.span>
-            )}
           </div>
 
           <button

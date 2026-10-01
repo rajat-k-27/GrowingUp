@@ -17,6 +17,7 @@ export const metadata = {
 };
 
 import { SocketProvider } from "@/components/SocketProvider";
+import { Toaster } from "react-hot-toast";
 
 export default function RootLayout({ children }) {
   return (
@@ -25,6 +26,15 @@ export default function RootLayout({ children }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <Toaster position="top-right" toastOptions={{
+          style: {
+            background: '#111',
+            color: '#fff',
+            border: '1px solid #333',
+            fontFamily: 'monospace'
+          },
+          success: { iconTheme: { primary: '#eab308', secondary: '#000' } }
+        }} />
         <SocketProvider>
           {children}
         </SocketProvider>

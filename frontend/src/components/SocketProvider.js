@@ -13,7 +13,7 @@ export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  const connect = () => {
+  const connect = (token) => {
     if (socket) return; // Already connected
 
     const defaultBackend = typeof window !== 'undefined' 
@@ -21,7 +21,10 @@ export const SocketProvider = ({ children }) => {
       : "http://localhost:5000";
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || defaultBackend;
     
-    const socketInstance = io(backendUrl);
+    // Pass the secure token during handshake
+    const socketInstance = io(backendUrl, {
+      auth: { token }
+    });
 
     socketInstance.on("connect", () => setIsConnected(true));
     socketInstance.on("disconnect", () => setIsConnected(false));

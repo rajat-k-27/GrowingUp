@@ -1,11 +1,13 @@
 "use client";
 
 import Window from "../Window";
-import { Camera, Image as ImageIcon, Send, Clock, Calendar } from "lucide-react";
+import { Camera, Image as ImageIcon, Send, Clock, Calendar, Trash2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSocket } from "../SocketProvider";
+import toast from "react-hot-toast";
 import ImageViewer from "../ImageViewer";
+import ConfirmModal from "../ConfirmModal";
 
 export default function Memories({ onClose, identity }) {
   const { socket } = useSocket();
@@ -13,6 +15,7 @@ export default function Memories({ onClose, identity }) {
   const [desc, setDesc] = useState("");
   const [imageStr, setImageStr] = useState(null);
   const [expandedImage, setExpandedImage] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -33,15 +36,21 @@ export default function Memories({ onClose, identity }) {
       const unique = history.filter((a, i, self) => self.findIndex(t => t.id === a.id) === i);
       setMemories(unique);
     };
+
+    const handleMemoryDeleted = (id) => {
+      setMemories(prev => prev.filter(m => m.id !== id && m._id !== id));
+    };
     
     socket.on("newMemory", handleNewMemory);
     socket.on("memoriesList", handleMemoriesList);
+    socket.on("memoryDeleted", handleMemoryDeleted);
     
     socket.emit("getMemories");
 
     return () => {
       socket.off("newMemory", handleNewMemory);
       socket.off("memoriesList", handleMemoriesList);
+      socket.off("memoryDeleted", handleMemoryDeleted);
     };
   }, [socket]);
 
@@ -85,8 +94,12 @@ export default function Memories({ onClose, identity }) {
 
   const handleCreate = (e) => {
     e.preventDefault();
-    if (!desc.trim() && !imageStr) return;
     if (!socket) return;
+    
+    if (!desc.trim() && !imageStr) {
+      toast.error("PLEASE ADD A PHOTO OR A DESCRIPTION");
+      return;
+    }
 
     const now = new Date();
     
@@ -105,6 +118,7 @@ export default function Memories({ onClose, identity }) {
     
     setDesc("");
     setImageStr(null);
+    toast.success("MEMORY SAVED");
   };
 
   return (
@@ -138,7 +152,14 @@ export default function Memories({ onClose, identity }) {
               )}
               <div className="p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-sm text-purple-400 font-mono tracking-widest">{mem.author}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-purple-400 font-mono tracking-widest">{mem.author}</span>
+                    {mem.author === identity && (
+                      <button onClick={() => setDeleteConfirmId(mem.id || mem._id)} className="text-gray-600 hover:text-red-500 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-3 text-xs text-gray-500 font-mono">
                     <span className="flex items-center gap-1"><Calendar size={12}/> {mem.date}</span>
                     <span className="flex items-center gap-1"><Clock size={12}/> {mem.time}</span>
@@ -198,6 +219,19 @@ export default function Memories({ onClose, identity }) {
           </form>
         </div>
       </div>
+      
+      <ConfirmModal 
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => {
+          if (socket && deleteConfirmId) {
+            socket.emit("deleteMemory", deleteConfirmId);
+          }
+        }}
+        title="DELETE MEMORY"
+        message="Are you sure you want to delete this memory? It will be permanently removed for everyone."
+      />
+
       {expandedImage && (
         <ImageViewer src={expandedImage} onClose={() => setExpandedImage(null)} />
       )}

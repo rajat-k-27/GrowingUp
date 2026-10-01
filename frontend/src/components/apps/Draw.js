@@ -65,12 +65,22 @@ export default function Draw({ onClose, identity }) {
       }
     };
 
+    const handleDrawState = (lines) => {
+      linesRef.current = lines;
+      redrawCanvas();
+    };
+
     socket.on("draw_line", handleDrawLine);
     socket.on("draw_clear", handleDrawClear);
+    socket.on("draw_state", handleDrawState);
+    
+    // Fetch persistent drawing state from Redis on mount
+    socket.emit("get_draw_state");
     
     return () => {
       socket.off("draw_line", handleDrawLine);
       socket.off("draw_clear", handleDrawClear);
+      socket.off("draw_state", handleDrawState);
     };
   }, [socket]);
 

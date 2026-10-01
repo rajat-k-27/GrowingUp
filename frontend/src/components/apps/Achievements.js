@@ -3,11 +3,14 @@ import { Trophy, Check, Plus, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSocket } from "../SocketProvider";
+import toast from "react-hot-toast";
+import ConfirmModal from "../ConfirmModal";
 
 export default function Achievements({ onClose, identity }) {
   const { socket } = useSocket();
 
   const [achievements, setAchievements] = useState([]);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -93,12 +96,17 @@ export default function Achievements({ onClose, identity }) {
 
   const handleCreate = (e) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newDesc.trim() || !socket) return;
+    if (!socket) return;
+
+    if (!newTitle.trim() || !newDesc.trim()) {
+      toast.error("TITLE AND DESCRIPTION ARE REQUIRED");
+      return;
+    }
     
     const newAch = {
       id: "CUSTOM_" + Date.now(),
-      title: newTitle.toUpperCase(),
-      desc: newDesc,
+      title: newTitle.trim().toUpperCase(),
+      desc: newDesc.trim(),
       unlocked: false,
       unlockedBy: null
     };
@@ -109,13 +117,12 @@ export default function Achievements({ onClose, identity }) {
     setNewTitle("");
     setNewDesc("");
     setIsCreating(false);
+    toast.success("ACHIEVEMENT CREATED");
   };
 
   const handleDelete = (e, id) => {
     e.stopPropagation();
-    if (!socket) return;
-    socket.emit("deleteAchievement", id);
-    setAchievements(prev => prev.filter(a => a.id !== id));
+    setDeleteConfirmId(id);
   };
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
@@ -189,6 +196,20 @@ export default function Achievements({ onClose, identity }) {
           </button>
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => {
+          if (socket && deleteConfirmId) {
+            socket.emit("deleteAchievement", deleteConfirmId);
+            setAchievements(prev => prev.filter(a => a.id !== deleteConfirmId));
+          }
+        }}
+        title="DELETE ACHIEVEMENT"
+        message="Are you sure you want to delete this custom achievement? It will be removed for everyone."
+      />
+
     </Window>
   );
 }

@@ -18,22 +18,25 @@ export default function BroOS() {
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem("bro_user");
-      if (savedUser) {
+      const savedToken = localStorage.getItem("bro_token");
+      if (savedUser && savedToken) {
         setUser(JSON.parse(savedUser));
         setShowLanding(false); // Skip landing if already logged in
-        connect(); // Connect to websocket since user is authenticated
+        connect(savedToken); // Connect to websocket with secure token
       }
     } catch(e) {}
   }, [connect]);
 
-  const handleLogin = (userData) => {
-    localStorage.setItem("bro_user", JSON.stringify(userData));
-    setUser(userData);
-    connect(); // Establish websocket connection!
+  const handleLogin = (data) => {
+    localStorage.setItem("bro_user", JSON.stringify(data.user));
+    localStorage.setItem("bro_token", data.token);
+    setUser(data.user);
+    connect(data.token); // Establish websocket connection!
   };
 
   const handleLogout = () => {
     localStorage.removeItem("bro_user");
+    localStorage.removeItem("bro_token");
     setUser(null);
     setActiveRoomCode(null);
     setShowLanding(true);

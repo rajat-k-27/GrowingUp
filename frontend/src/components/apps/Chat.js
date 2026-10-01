@@ -6,12 +6,28 @@ import { useState, useRef, useEffect } from "react";
 import { useSocket } from "../SocketProvider";
 import AudioPlayer from "../AudioPlayer";
 import ImageViewer from "../ImageViewer";
+import { format, isToday, isYesterday } from 'date-fns';
+
+const formatDividerDate = (dateInput) => {
+  if (!dateInput) return "";
+  const date = new Date(dateInput);
+  if (isToday(date)) return "TODAY";
+  if (isYesterday(date)) return "YESTERDAY";
+  const diffDays = Math.floor((new Date() - date) / (1000 * 60 * 60 * 24));
+  if (diffDays < 7) return format(date, 'EEEE').toUpperCase();
+  return format(date, 'MM/dd/yyyy');
+};
+
+const formatMessageTime = (dateInput) => {
+  if (!dateInput) return "";
+  return format(new Date(dateInput), 'h:mm a');
+};
 
 export default function Chat({ onClose, identity }) {
   const { socket } = useSocket();
   
   const [messages, setMessages] = useState([
-    { id: 1, sender: "SYSTEM", text: "Secure peer-to-peer chat established." }
+    { id: 1, sender: "SYSTEM", text: "Secure peer-to-peer chat established.", createdAt: new Date() }
   ]);
   const [input, setInput] = useState("");
   const [mediaBase64, setMediaBase64] = useState(null);
@@ -148,35 +164,53 @@ export default function Chat({ onClose, identity }) {
     <Window title="SECURE_CHAT.exe" onClose={onClose} icon={MessageSquare}>
       <div className="flex flex-col h-full font-sans">
         <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 pb-4 hide-scrollbar">
-          {messages.map((msg, idx) => (
-            <div key={msg._id || msg.id || idx} className={`flex flex-col ${msg.sender === identity ? "items-end" : msg.sender === "SYSTEM" ? "items-center" : "items-start"}`}>
-              {msg.sender !== "SYSTEM" && (
-                <span className="text-[10px] text-gray-500 font-mono mb-1 tracking-widest">{msg.sender}</span>
-              )}
-              <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] break-words shadow-lg ${
-                msg.sender === identity ? "bg-gradient-to-br from-green-600/30 to-green-800/30 border border-green-500/40 text-green-50 rounded-tr-sm" :
-                msg.sender === "SYSTEM" ? "bg-gray-900 border border-gray-800 text-gray-500 font-mono text-xs px-4 py-1 rounded-full" :
-                "bg-gradient-to-br from-blue-600/30 to-blue-800/30 border border-blue-500/40 text-blue-50 rounded-tl-sm"
-              }`}>
-                {msg.mediaUrl && (
-                  <div className="mb-2">
-                    {msg.mediaType === "video" || msg.mediaType === "audio" || msg.mediaUrl.endsWith(".webm") || msg.mediaUrl.endsWith(".mp4") ? (
-                      <AudioPlayer src={msg.mediaUrl} />
-                    ) : (
-                      <img 
-                        src={msg.mediaUrl} 
-                        alt="attachment" 
-                        className="rounded-xl max-w-full sm:max-w-xs max-h-64 object-cover border border-white/10 cursor-pointer hover:opacity-90 transition-opacity" 
-                        loading="lazy" 
-                        onClick={() => setExpandedImage(msg.mediaUrl)}
-                      />
-                    )}
+          {messages.map((msg, idx) => {
+            const currentMsgDate = msg.createdAt ? new Date(msg.createdAt).toDateString() : null;
+            const prevMsgDate = idx > 0 && messages[idx - 1].createdAt ? new Date(messages[idx - 1].createdAt).toDateString() : null;
+            const showDivider = currentMsgDate && currentMsgDate !== prevMsgDate;
+            
+            return (
+              <div key={msg._id || msg.id || idx}>
+                {showDivider && (
+                  <div className="flex justify-center my-4">
+                    <span className="bg-gray-800 text-gray-400 text-[10px] font-mono px-3 py-1 rounded-full shadow border border-gray-700/50">
+                      {formatDividerDate(msg.createdAt)}
+                    </span>
                   </div>
                 )}
-                {msg.text && <span className="leading-relaxed">{msg.text}</span>}
+                <div className={`flex flex-col mb-2 ${msg.sender === identity ? "items-end" : msg.sender === "SYSTEM" ? "items-center" : "items-start"}`}>
+                  {msg.sender !== "SYSTEM" && (
+                    <span className="text-[10px] text-gray-500 font-mono mb-1 tracking-widest">{msg.sender}</span>
+                  )}
+                  <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] break-words shadow-lg ${
+                    msg.sender === identity ? "bg-gradient-to-br from-green-600/30 to-green-800/30 border border-green-500/40 text-green-50 rounded-tr-sm" :
+                    msg.sender === "SYSTEM" ? "bg-gray-900 border border-gray-800 text-gray-500 font-mono text-xs px-4 py-1 rounded-full" :
+                    "bg-gradient-to-br from-blue-600/30 to-blue-800/30 border border-blue-500/40 text-blue-50 rounded-tl-sm"
+                  }`}>
+                    {msg.mediaUrl && (
+                      <div className="mb-2">
+                        {msg.mediaType === "video" || msg.mediaType === "audio" || msg.mediaUrl.endsWith(".webm") || msg.mediaUrl.endsWith(".mp4") ? (
+                          <AudioPlayer src={msg.mediaUrl} />
+                        ) : (
+                          <img 
+                            src={msg.mediaUrl} 
+                            alt="attachment" 
+                            className="rounded-xl max-w-full sm:max-w-xs max-h-64 object-cover border border-white/10 cursor-pointer hover:opacity-90 transition-opacity" 
+                            loading="lazy" 
+                            onClick={() => setExpandedImage(msg.mediaUrl)}
+                          />
+                        )}
+                      </div>
+                    )}
+                    {msg.text && <span className="leading-relaxed block">{msg.text}</span>}
+                    <div className={`text-[9px] mt-1 text-right opacity-60 font-mono tracking-widest ${msg.sender === identity ? "text-green-200" : msg.sender === "SYSTEM" ? "hidden" : "text-blue-200"}`}>
+                      {msg.createdAt ? formatMessageTime(msg.createdAt) : msg.time}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={endRef} />
         </div>
 

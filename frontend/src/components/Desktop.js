@@ -46,16 +46,25 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
       <BroNet identity={identity} roomCode={roomCode} onExitRoom={onExitRoom} />
       
       <div className="flex-1 flex relative overflow-hidden">
-        {/* Left Desktop Icons */}
-        <div className="w-24 p-4 flex flex-col gap-6 z-50 hidden sm:flex relative">
+        {/* Left Desktop Dock */}
+        <div className="w-20 lg:w-24 hidden sm:flex flex-col items-center gap-4 z-40 py-6 px-2 bg-black/50 backdrop-blur-3xl border-r border-white/10 shadow-[10px_0_30px_rgba(0,0,0,0.5)] relative overflow-y-auto hide-scrollbar">
+          {/* Subtle accent line */}
+          <div className="absolute top-0 bottom-0 left-0 w-0.5 bg-gradient-to-b from-transparent via-blue-500/50 to-transparent" />
+          
           {icons.map((item, i) => (
             <button
               key={i}
               onClick={item.onClick}
-              className="flex flex-col items-center gap-1 group hover:bg-white/10 p-2 rounded transition-colors relative z-50 cursor-pointer"
+              className="group relative flex flex-col items-center justify-center w-full aspect-square rounded-2xl hover:bg-white/10 transition-all duration-300 cursor-pointer overflow-hidden border border-transparent hover:border-white/20"
             >
-              <item.icon className={`w-8 h-8 ${item.color} group-hover:scale-110 transition-transform drop-shadow-lg`} />
-              <span className="text-[10px] text-center font-mono break-words">{item.name}</span>
+              {/* Background Glow */}
+              <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-white`} />
+              
+              <item.icon className={`w-7 h-7 lg:w-8 lg:h-8 ${item.color} group-hover:-translate-y-2 transition-transform duration-300 drop-shadow-[0_0_10px_currentColor]`} />
+              
+              <span className="absolute bottom-2 text-[8px] lg:text-[9px] font-mono opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold tracking-widest translate-y-2 group-hover:translate-y-0 duration-300">
+                {item.name.replace('.exe', '')}
+              </span>
             </button>
           ))}
         </div>
@@ -102,11 +111,26 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
         </div>
 
         {/* Mobile Bottom Dock (visible on mobile) */}
-        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0f] border-t border-gray-800 p-2 flex justify-around items-center pb-safe z-[60]">
-           <button onClick={() => setShowDrop(true)} className="p-3 text-blue-400 flex flex-col items-center gap-1"><Package size={24} /><span className="text-[10px] font-mono">DROP</span></button>
-           <button onClick={() => setActiveWindow("CHAT")} className="p-3 text-green-400 flex flex-col items-center gap-1"><MessageSquare size={24} /><span className="text-[10px] font-mono">CHAT</span></button>
-           <button onClick={() => setShowPing(true)} className="p-3 text-red-400 flex flex-col items-center gap-1"><AlertTriangle size={24} /><span className="text-[10px] font-mono">PING</span></button>
-           <button onClick={() => setShowAppDrawer(true)} className="p-3 text-white flex flex-col items-center gap-1"><Grid size={24} /><span className="text-[10px] font-mono">APPS</span></button>
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[60] bg-black/90 backdrop-blur-3xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] pb-[env(safe-area-inset-bottom)]">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          <div className="flex justify-around items-center p-2">
+            <button onClick={() => setShowDrop(true)} className="flex-1 flex flex-col items-center gap-1.5 p-2 active:scale-95 transition-all text-blue-400">
+               <Package size={24} className="drop-shadow-[0_0_10px_currentColor]" />
+               <span className="text-[9px] font-bold font-mono tracking-widest text-white">DROP</span>
+            </button>
+            <button onClick={() => setActiveWindow("CHAT")} className="flex-1 flex flex-col items-center gap-1.5 p-2 active:scale-95 transition-all text-green-400 relative">
+               <MessageSquare size={24} className="drop-shadow-[0_0_10px_currentColor]" />
+               <span className="text-[9px] font-bold font-mono tracking-widest text-white">CHAT</span>
+            </button>
+            <button onClick={() => setShowPing(true)} className="flex-1 flex flex-col items-center gap-1.5 p-2 active:scale-95 transition-all text-red-400">
+               <AlertTriangle size={24} className="drop-shadow-[0_0_10px_currentColor]" />
+               <span className="text-[9px] font-bold font-mono tracking-widest text-white">PING</span>
+            </button>
+            <button onClick={() => setShowAppDrawer(true)} className="flex-1 flex flex-col items-center gap-1.5 p-2 active:scale-95 transition-all text-gray-300">
+               <Grid size={24} className="drop-shadow-[0_0_10px_currentColor]" />
+               <span className="text-[9px] font-bold font-mono tracking-widest text-white">APPS</span>
+            </button>
+          </div>
         </div>
 
         {/* Mobile App Drawer Overlay */}

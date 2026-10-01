@@ -43,82 +43,107 @@ export default function BroNet({ identity, roomCode, onExitRoom }) {
   
   return (
     <>
-      <div className="w-full relative flex flex-col md:flex-row items-center justify-between p-3 sm:p-4 border-b border-gray-800 bg-black/40 backdrop-blur-md gap-4 md:gap-0">
-        
-        {/* Mobile Top Row: Logo & Exit */}
-        <div className="flex items-center justify-between w-full md:w-auto">
-          {/* Left: Logo */}
-          <div className="flex flex-col items-start gap-1 shrink-0">
-            <div className="text-red-500 font-mono tracking-widest font-bold flex items-center gap-2">
-              <span>BRO_OS</span> 
-              <span className="text-gray-400 bg-gray-900 px-2 py-0.5 rounded text-[10px] border border-gray-700">ROOM: {roomCode}</span>
-            </div>
+      <div className="w-full shrink-0 relative z-50">
+        {/* DESKTOP & TABLET NAVBAR (md and up) */}
+        <div className="hidden md:flex w-full h-14 bg-black/60 backdrop-blur-2xl border-b border-white/5 items-center justify-between px-4 lg:px-6 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+          {/* Left: Branding */}
+          <div className="flex items-center gap-2 lg:gap-4 shrink-0">
+            <span className="text-red-500 font-black font-mono text-lg lg:text-xl tracking-widest drop-shadow-[0_0_8px_rgba(239,68,68,0.6)]">BRO_OS</span>
+            <span className="bg-white/5 px-2 py-1 rounded text-[9px] lg:text-[10px] font-mono border border-white/10 text-gray-400 tracking-widest flex items-center">
+              <span className="hidden lg:inline mr-1">ROOM:</span> <span className="text-white">{roomCode}</span>
+            </span>
           </div>
-          
-          {/* Right: Exit (Mobile) */}
-          <div className="md:hidden shrink-0">
+
+          {/* Center: Connection Status */}
+          <button 
+            onClick={() => setShowModal(true)} 
+            className="flex items-center gap-2 lg:gap-4 group cursor-pointer hover:bg-white/5 px-2 lg:px-6 py-1.5 lg:py-2 rounded-full transition-all duration-300 border border-transparent hover:border-white/10 shrink-0"
+          >
+            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]" />
+            <div className="w-20 lg:w-48 h-1 bg-gray-900 rounded-full overflow-hidden relative shadow-inner">
+              {(isConnected && hasPartners) && (
+                <motion.div 
+                  className="absolute inset-y-0 w-8 lg:w-12 bg-blue-500 rounded-full shadow-[0_0_10px_#3b82f6]" 
+                  animate={{ left: ["-30%", "130%"] }} 
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} 
+                />
+              )}
+            </div>
+            <div className={`w-2 h-2 rounded-full ${hasPartners ? 'bg-blue-500 shadow-[0_0_10px_#3b82f6]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'} animate-pulse`} />
+            
+            <div className="flex flex-col items-start ml-2 gap-1">
+              <span className="text-[9px] lg:text-[10px] text-blue-400 font-mono font-bold tracking-widest leading-none">
+                {isConnected && hasPartners ? "SECURE LINK ACTIVE" : "WAITING"}
+              </span>
+              <span className="text-[8px] lg:text-[9px] text-gray-500 font-mono tracking-widest leading-none group-hover:text-gray-300 transition-colors">
+                {hasPartners ? `${onlinePartners.length + 1} NODES CONNECTED` : "1 NODE CONNECTED"}
+              </span>
+            </div>
+          </button>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2 lg:gap-4 shrink-0">
             <button 
-              onClick={handleExit}
-              className="p-1.5 bg-red-950/40 border border-red-900/60 hover:bg-red-900/60 text-red-400 rounded"
+              onClick={handleExit} 
+              className="flex items-center gap-1 lg:gap-2 text-red-500 hover:text-red-400 font-mono text-[10px] lg:text-xs font-bold bg-red-500/10 hover:bg-red-500/20 px-3 lg:px-4 py-1.5 lg:py-2 rounded-lg transition-all border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] whitespace-nowrap"
             >
-              <LogOut size={16} />
+              <LogOut size={14} /> LEAVE ROOM
             </button>
           </div>
         </div>
 
-        {/* Center Group: You, Bar, Them (Clickable) */}
-        {/* Center Group: Minimalist Connection Bar (Clickable) */}
-        <div className="w-full md:flex-1 flex justify-center mt-2 md:mt-0">
-          <button 
-            onClick={() => setShowModal(true)}
-            className="flex flex-col items-center gap-1.5 font-mono w-full md:w-auto hover:bg-white/5 p-2 rounded-xl transition-colors cursor-pointer group"
-          >
-            {/* Dots and Bar Row */}
-            <div className="flex items-center gap-3 w-48 sm:w-[250px] md:w-[300px] justify-center shrink-0 mb-1">
-              {/* Green Dot (You) */}
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse shrink-0"></div>
-              
-              {/* Connection Bar */}
-              <div className="relative flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                {(isConnected && hasPartners) && (
-                  <motion.div
-                    className="absolute top-0 bottom-0 w-16 bg-blue-500 rounded-full shadow-[0_0_8px_#3b82f6]"
-                    animate={{ left: ["0%", "100%", "0%"] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                  />
-                )}
+        {/* MOBILE & TABLET NAVBAR (max-md) */}
+        <div className="md:hidden flex flex-col items-center justify-center pt-3 px-3 pb-2 z-50">
+          <div className="w-full max-w-lg bg-black/70 backdrop-blur-2xl border border-white/10 rounded-2xl p-3 flex flex-col gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)] relative overflow-hidden">
+            {/* Decorative top glow */}
+            <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+            
+            {/* Top Row */}
+            <div className="flex justify-between items-center w-full">
+              <div className="flex items-center gap-3">
+                <span className="text-red-500 font-black font-mono text-sm tracking-widest drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]">BRO_OS</span>
+                <span className="bg-gray-900/80 px-2 py-0.5 rounded font-mono border border-gray-700 text-gray-400 tracking-widest flex items-center">
+                  <span className="text-[8px] mr-1">RM:</span> <span className="text-[10px] text-white">{roomCode}</span>
+                </span>
               </div>
-
-              {/* Blue/Red Dot (Them) */}
-              {hasPartners ? (
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6] animate-pulse shrink-0"></div>
-              ) : (
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444] shrink-0"></div>
-              )}
+              <button 
+                onClick={handleExit} 
+                className="p-2 bg-red-500/10 text-red-500 rounded-xl border border-red-500/20 hover:bg-red-500/20 transition-colors"
+              >
+                <LogOut size={14} />
+              </button>
             </div>
 
-            {/* Status Text */}
-            <span className="text-[10px] text-blue-400 tracking-widest font-bold group-hover:text-blue-300">
-              {isConnected && hasPartners ? "SECURE LINK ACTIVE" : "WAITING FOR PEERS"}
-            </span>
-            
-            {/* View Members Pill */}
-            <span className="text-[9px] text-gray-400 group-hover:text-white tracking-widest mt-1 border border-gray-700 px-4 py-1 rounded-full bg-gray-900/80 shadow-lg transition-colors">
-              VIEW MEMBERS ({hasPartners ? onlinePartners.length + 1 : 1})
-            </span>
-          </button>
+            {/* Bottom Row: Connection Pill */}
+            <button 
+              onClick={() => setShowModal(true)} 
+              className="flex items-center justify-between w-full bg-white/5 border border-white/5 rounded-xl p-2.5 active:bg-white/10 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]" />
+                <div className="w-16 sm:w-32 h-1 bg-gray-900 rounded-full overflow-hidden relative">
+                  {(isConnected && hasPartners) && (
+                    <motion.div 
+                      className="absolute inset-y-0 w-8 bg-blue-500 rounded-full shadow-[0_0_8px_#3b82f6]" 
+                      animate={{ left: ["-50%", "150%"] }} 
+                      transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} 
+                    />
+                  )}
+                </div>
+                <div className={`w-2 h-2 rounded-full ${hasPartners ? 'bg-blue-500 shadow-[0_0_8px_#3b82f6]' : 'bg-red-500 shadow-[0_0_8px_#ef4444]'} animate-pulse`} />
+              </div>
+              
+              <div className="flex flex-col text-right">
+                <span className="text-[9px] font-mono text-blue-400 font-bold tracking-widest">
+                  {isConnected && hasPartners ? "LINK ACTIVE" : "WAITING"}
+                </span>
+                <span className="text-[8px] font-mono text-gray-500 tracking-widest">
+                  {hasPartners ? `${onlinePartners.length + 1} NODES` : "1 NODE"}
+                </span>
+              </div>
+            </button>
+          </div>
         </div>
-
-        {/* Right: Exit (Desktop) */}
-        <div className="hidden md:flex items-center shrink-0">
-          <button 
-            onClick={handleExit}
-            className="px-3 py-1.5 bg-red-950/40 border border-red-900/60 hover:bg-red-900/60 hover:border-red-500 text-red-400 text-xs font-bold tracking-widest flex items-center gap-2 rounded transition-all shadow-[0_0_10px_rgba(239,68,68,0.1)] hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-          >
-            <LogOut size={14} /> <span>LEAVE NETWORK</span>
-          </button>
-        </div>
-        
       </div>
 
       <AnimatePresence>

@@ -4,6 +4,7 @@ import Window from "../Window";
 import { Lock, Unlock, Eye, Send } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useSocket } from "../SocketProvider";
+import toast from "react-hot-toast";
 
 export default function Secret({ onClose, identity }) {
   const { socket } = useSocket();
@@ -53,15 +54,21 @@ export default function Secret({ onClose, identity }) {
     if (password.trim() !== "") {
       setCurrentPin(password.trim());
       setUnlocked(true);
+      toast.success("ACCESS GRANTED");
     } else {
       setError(true);
+      toast.error("PIN CANNOT BE EMPTY");
       setTimeout(() => setError(false), 2000);
     }
   };
 
   const handleSendSecret = (e) => {
     e.preventDefault();
-    if (!input.trim() || !socket || !currentPin) return;
+    if (!socket || !currentPin) return;
+    if (!input.trim()) {
+      toast.error("CANNOT SEND EMPTY MESSAGE");
+      return;
+    }
     const newSecret = { id: Date.now(), sender: identity, text: input, timestamp: new Date().toLocaleTimeString(), pin: currentPin };
     socket.emit("secretMessage", newSecret);
     setInput("");

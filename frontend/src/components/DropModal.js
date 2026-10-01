@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useSocket } from "./SocketProvider";
 import { Camera, Type, Mic, Image as ImageIcon, Zap, X } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function DropModal({ onClose, identity }) {
   const { socket } = useSocket();
@@ -67,6 +68,11 @@ export default function DropModal({ onClose, identity }) {
 
   const handleSend = () => {
     if (!socket) return;
+    if (!text.trim() && !mediaBase64) {
+      toast.error("DROP CANNOT BE EMPTY");
+      return;
+    }
+
     setIsUploading(true);
     socket.emit("sendDrop", { 
       identity, 
@@ -76,6 +82,7 @@ export default function DropModal({ onClose, identity }) {
     });
     // We can close immediately, the server handles the upload
     onClose();
+    toast.success("DROP SENT TO WALL");
   };
 
   return (
