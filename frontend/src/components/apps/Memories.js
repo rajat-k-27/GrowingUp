@@ -12,6 +12,7 @@ import ConfirmModal from "../ConfirmModal";
 export default function Memories({ onClose, identity }) {
   const { socket } = useSocket();
   const [memories, setMemories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [desc, setDesc] = useState("");
   const [imageStr, setImageStr] = useState(null);
   const [expandedImage, setExpandedImage] = useState(null);
@@ -35,19 +36,26 @@ export default function Memories({ onClose, identity }) {
       // Deduplicate history
       const unique = history.filter((a, i, self) => self.findIndex(t => t.id === a.id) === i);
       setMemories(unique);
+      setIsLoading(false);
     };
 
     const handleMemoryDeleted = (id) => {
       setMemories(prev => prev.filter(m => m.id !== id && m._id !== id));
     };
     
+    const fetchInit = () => {
+      socket.emit("getMemories");
+    };
+
+    if (socket.connected) fetchInit();
+    socket.on("connect", fetchInit);
+
     socket.on("newMemory", handleNewMemory);
     socket.on("memoriesList", handleMemoriesList);
     socket.on("memoryDeleted", handleMemoryDeleted);
-    
-    socket.emit("getMemories");
 
     return () => {
+      socket.off("connect", fetchInit);
       socket.off("newMemory", handleNewMemory);
       socket.off("memoriesList", handleMemoriesList);
       socket.off("memoryDeleted", handleMemoryDeleted);
@@ -127,12 +135,17 @@ export default function Memories({ onClose, identity }) {
         
         {/* Memory Feed */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {memories.length === 0 && (
-            <div className="text-gray-500 text-center mt-10 text-sm italic">
-              No memories yet. Upload one below.
+          {isLoading ? (
+             <div className="flex flex-col items-center justify-center h-40 opacity-50 space-y-4 mt-10">
+                <div className="w-8 h-8 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin"></div>
+                <div className="text-yellow-500/50 text-[10px] tracking-widest font-bold font-mono">LOADING DATA...</div>
+             </div>
+          ) : memories.length === 0 ? (
+            <div className="flex flex-col items-center justify-center mt-20 opacity-30 space-y-3">
+               <Camera size={48} className="text-gray-500" />
+               <div className="text-gray-500 text-[10px] tracking-widest font-bold text-center font-mono">NO MEMORIES YET<br/><span className="text-[8px]">SNAP SOMETHING BELOW</span></div>
             </div>
-          )}
-          {memories.map((mem) => (
+          ) : memories.map((mem) => (
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

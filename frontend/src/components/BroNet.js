@@ -15,8 +15,15 @@ export default function BroNet({ identity, roomCode, onExitRoom }) {
   useEffect(() => {
     if (!socket) return;
     
-    // Join the room with our identity
-    socket.emit("joinRoom", { username: identity, roomCode });
+    const handleConnect = () => {
+      socket.emit("joinRoom", { username: identity, roomCode });
+    };
+
+    if (socket.connected) {
+      handleConnect();
+    }
+
+    socket.on("connect", handleConnect);
 
     socket.on("roomUsers", (users) => {
       // Filter ourselves out so we only show partners
@@ -28,9 +35,10 @@ export default function BroNet({ identity, roomCode, onExitRoom }) {
     });
 
     return () => {
+      socket.off("connect", handleConnect);
       socket.off("roomUsers");
       socket.off("roomMembers");
-      socket.emit("leaveRoom");
+      // Intentionally NOT emitting leaveRoom here so refresh keeps the user in the room
     };
   }, [socket, identity, roomCode]);
 
@@ -150,6 +158,7 @@ export default function BroNet({ identity, roomCode, onExitRoom }) {
         {showModal && (
           <ConnectionsModal 
             identity={identity} 
+            roomCode={roomCode}
             partners={onlinePartners}
             allMembers={allMembers}
             onClose={() => setShowModal(false)} 

@@ -19,10 +19,14 @@ export default function BroOS() {
     try {
       const savedUser = localStorage.getItem("bro_user");
       const savedToken = localStorage.getItem("bro_token");
+      const savedRoom = localStorage.getItem("bro_room");
       if (savedUser && savedToken) {
         setUser(JSON.parse(savedUser));
         setShowLanding(false); // Skip landing if already logged in
         connect(savedToken); // Connect to websocket with secure token
+        if (savedRoom) {
+          setActiveRoomCode(savedRoom);
+        }
       }
     } catch(e) {}
   }, [connect]);
@@ -37,10 +41,21 @@ export default function BroOS() {
   const handleLogout = () => {
     localStorage.removeItem("bro_user");
     localStorage.removeItem("bro_token");
+    localStorage.removeItem("bro_room");
     setUser(null);
     setActiveRoomCode(null);
     setShowLanding(true);
     disconnect(); // Disconnect websocket to save server resources!
+  };
+
+  const handleJoinRoom = (code) => {
+    localStorage.setItem("bro_room", code);
+    setActiveRoomCode(code);
+  };
+
+  const handleExitRoom = () => {
+    localStorage.removeItem("bro_room");
+    setActiveRoomCode(null);
   };
 
   if (!user && showLanding) {
@@ -52,14 +67,14 @@ export default function BroOS() {
   }
 
   if (!activeRoomCode) {
-    return <Dashboard user={user} onJoinRoom={setActiveRoomCode} onLogout={handleLogout} />;
+    return <Dashboard user={user} onJoinRoom={handleJoinRoom} onLogout={handleLogout} />;
   }
 
   return (
     <div className="h-full w-full relative">
       <div className="bg-grid" />
       <div className="crt-noise" />
-      <Desktop identity={user.username} roomCode={activeRoomCode} onExitRoom={() => setActiveRoomCode(null)} />
+      <Desktop identity={user.username} roomCode={activeRoomCode} onExitRoom={handleExitRoom} />
     </div>
   );
 }

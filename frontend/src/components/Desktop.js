@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import BroNet from "./BroNet";
-import { Package, Brain, Camera, PlayCircle, Palette, Trophy, Lock, MessageSquare, Zap, AlertTriangle, Heart, X, Grid } from "lucide-react";
+import { Package, Wallet, Camera, PlayCircle, Palette, Trophy, Lock, MessageSquare, Zap, AlertTriangle, Heart, X, Grid } from "lucide-react";
 import DropModal from "./DropModal";
 import PingModal from "./PingModal";
 import BroWall from "./BroWall";
@@ -24,9 +24,18 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
   const [showAppDrawer, setShowAppDrawer] = useState(false);
   const { socket } = useSocket();
 
+  useEffect(() => {
+    // Request push notification permission
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
   const icons = [
     { name: "DROP.exe", icon: Package, color: "text-blue-400", onClick: () => setShowDrop(true) },
-    { name: "BRAIN.exe", icon: Brain, color: "text-pink-400", onClick: () => setActiveWindow("BRAIN") },
+    { name: "LEDGER.exe", icon: Wallet, color: "text-green-500", onClick: () => setActiveWindow("BRAIN") },
     { name: "MEMORIES.exe", icon: Camera, color: "text-yellow-400", onClick: () => setActiveWindow("MEMORIES") },
     { name: "SYNC.exe", icon: PlayCircle, color: "text-blue-400", onClick: () => setActiveWindow("SYNC") },
     { name: "DRAW.exe", icon: Palette, color: "text-purple-400", onClick: () => setActiveWindow("DRAW") },
@@ -34,12 +43,6 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
     { name: "SECRET.exe", icon: Lock, color: "text-gray-500", onClick: () => setActiveWindow("SECRET") },
     { name: "CHAT.exe", icon: MessageSquare, color: "text-green-400", onClick: () => setActiveWindow("CHAT") },
   ];
-
-  const handleImHere = () => {
-    if (socket) {
-      socket.emit("imHere", { identity, timestamp: Date.now() });
-    }
-  };
 
   return (
     <div className="flex flex-col h-full text-white font-sans selection:bg-blue-500/30">
@@ -86,21 +89,17 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
             </button>
 
             {/* Quick Actions Row */}
-            <div className="flex gap-4 w-full flex-shrink-0">
+            <div className="w-full flex-shrink-0">
               <button 
                 onClick={() => setShowPing(true)}
-                className="flex-1 glass-panel border border-red-500/30 p-4 rounded-xl flex items-center justify-center gap-2 hover:bg-red-500/10 transition-colors group"
+                className="w-full relative group overflow-hidden rounded-2xl p-[1px]"
               >
-                <AlertTriangle className="w-5 h-5 text-red-500 group-hover:animate-pulse" />
-                <span className="font-bold text-red-100 tracking-wider">PING BRO</span>
-              </button>
-
-              <button 
-                onClick={handleImHere}
-                className="flex-1 glass-panel border border-pink-500/30 p-4 rounded-xl flex items-center justify-center gap-2 hover:bg-pink-500/10 transition-colors group"
-              >
-                <Heart className="w-5 h-5 text-pink-500 group-hover:scale-110 transition-transform" />
-                <span className="font-bold text-pink-100 tracking-wider">I'M HERE</span>
+                {/* Animated gradient border */}
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-blue-500 to-cyan-600 bg-[length:200%_auto] animate-[pulse_3s_ease-in-out_infinite] opacity-60 group-hover:opacity-100 transition-opacity" />
+                <div className="relative bg-black/80 backdrop-blur-xl p-4 rounded-2xl flex items-center justify-center gap-3 transition-colors group-hover:bg-black/60">
+                  <AlertTriangle className="w-6 h-6 text-cyan-400 group-hover:scale-110 transition-transform drop-shadow-[0_0_8px_#22d3ee]" />
+                  <span className="font-black text-cyan-100 tracking-[0.3em] font-mono text-lg drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">PING</span>
+                </div>
               </button>
             </div>
 
@@ -122,7 +121,7 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
                <MessageSquare size={24} className="drop-shadow-[0_0_10px_currentColor]" />
                <span className="text-[9px] font-bold font-mono tracking-widest text-white">CHAT</span>
             </button>
-            <button onClick={() => setShowPing(true)} className="flex-1 flex flex-col items-center gap-1.5 p-2 active:scale-95 transition-all text-red-400">
+            <button onClick={() => setShowPing(true)} className="flex-1 flex flex-col items-center gap-1.5 p-2 active:scale-95 transition-all text-cyan-400">
                <AlertTriangle size={24} className="drop-shadow-[0_0_10px_currentColor]" />
                <span className="text-[9px] font-bold font-mono tracking-widest text-white">PING</span>
             </button>

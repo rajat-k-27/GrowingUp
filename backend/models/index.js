@@ -5,6 +5,7 @@ const ActivityData = require('./ActivityData');
 const AchievementData = require('./AchievementData');
 const SecretData = require('./SecretData');
 const MemoryData = require('./MemoryData');
+const Expense = require('./Expense');
 
 module.exports = {
   UserData,
@@ -13,5 +14,6 @@ module.exports = {
   ActivityData,
   AchievementData,
   SecretData,
-  MemoryData
+  MemoryData,
+  Expense
 };

@@ -1,4 +1,4 @@
-const { ActivityData, ChatMessage, SecretData, AchievementData, MemoryData } = require('../models');
+const { ActivityData, ChatMessage, SecretData, AchievementData, MemoryData, Expense } = require('../models');
 const cloudinary = require('../config/cloudinary');
 const redis = require('../config/redis');
 
@@ -445,6 +445,58 @@ module.exports = (io) => {
         console.error(e);
       }
     });
+    socket.on("getLedgerHistory", async () => {
+      try {
+        const history = await Expense.find({ roomCode: socket.roomCode }).sort({ createdAt: -1 }).lean();
+        socket.emit("ledgerHistory", history);
+      } catch (e) { console.error(e); }
+    });
+
+    socket.on("getRoomUsers", () => {
+      if (rooms[socket.roomCode]) {
+        socket.emit("roomUsers", Array.from(rooms[socket.roomCode]));
+      }
+    });
+
+    socket.on("getRoomMembers", async () => {
+      try {
+        const { RoomData } = require('../models');
+        const room = await RoomData.findOne({ code: socket.roomCode }).lean();
+        if (room && room.members) {
+          socket.emit("roomMembers", room.members);
+        }
+      } catch (e) { console.error(e); }
+    });
+
+    socket.on("createExpense", async (data) => {
+      try {
+        const newExp = await Expense.create({ ...data, roomCode: socket.roomCode });
+        io.to(socket.roomCode).emit("newExpense", newExp);
+      } catch(e) { console.error(e); }
+    });
+
+    socket.on("deleteExpense", async (id) => {
+      try {
+        await Expense.findByIdAndDelete(id);
+        io.to(socket.roomCode).emit("expenseDeleted", id);
+      } catch(e) { console.error(e); }
+    });
+
+    socket.on("editExpense", async ({ id, title, amount }) => {
+      try {
+        const exp = await Expense.findByIdAndUpdate(id, { title, amount }, { new: true });
+        io.to(socket.roomCode).emit("expenseUpdated", exp);
+      } catch(e) { console.error(e); }
+    });
+
+    socket.on("settleDebts", async () => {
+      try {
+        await Expense.updateMany({ roomCode: socket.roomCode, settled: false }, { settled: true });
+        const history = await Expense.find({ roomCode: socket.roomCode }).sort({ createdAt: -1 }).lean();
+        io.to(socket.roomCode).emit("ledgerHistory", history);
+      } catch(e) { console.error(e); }
+    });
+
 
     socket.on("disconnect", () => {
       if (socket.roomCode && socket.username) {

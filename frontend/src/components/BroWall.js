@@ -67,6 +67,16 @@ export default function BroWall({ identity }) {
 
     socket.on("newPing", (data) => {
       addActivity(`Pinged: "${data.reason}"`, data.identity, "ping");
+      
+      // Trigger Push Notification if from someone else
+      if (data.identity !== identity && typeof window !== "undefined" && "Notification" in window) {
+        if (Notification.permission === "granted") {
+          new Notification(`PING FROM ${data.identity}`, {
+            body: data.reason,
+            icon: '/icon.png'
+          });
+        }
+      }
     });
 
     socket.on("hereUpdate", (data) => {

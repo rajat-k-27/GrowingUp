@@ -1,9 +1,20 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { X, Users, Activity, Clock } from "lucide-react";
+import { X, Users, Activity, Clock, Copy, Check } from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
 
-export default function ConnectionsModal({ onClose, identity, partners, allMembers = [] }) {
+export default function ConnectionsModal({ onClose, identity, roomCode, partners, allMembers = [] }) {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = () => {
+    navigator.clipboard.writeText(roomCode);
+    setCopied(true);
+    toast.success("Room code copied!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   // Find offline members and remove any duplicates
   const activeMembersSet = new Set([...partners, identity]);
   const offlineMembers = Array.from(new Set(allMembers.filter(m => !activeMembersSet.has(m))));
@@ -26,6 +37,21 @@ export default function ConnectionsModal({ onClose, identity, partners, allMembe
         </div>
 
         <div className="p-4 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
+          {roomCode && (
+            <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex items-center justify-between mb-2">
+              <div>
+                <div className="text-[9px] text-blue-400 font-bold tracking-widest mb-1">ROOM CODE</div>
+                <div className="text-xl font-black text-white tracking-widest">{roomCode}</div>
+              </div>
+              <button 
+                onClick={handleCopy}
+                className="w-10 h-10 bg-blue-500/20 hover:bg-blue-500/40 text-blue-400 rounded-lg flex items-center justify-center transition-colors"
+              >
+                {copied ? <Check size={18} /> : <Copy size={18} />}
+              </button>
+            </div>
+          )}
+
           <div className="text-xs text-gray-500 tracking-widest border-b border-gray-800 pb-2 flex justify-between">
             <span>NETWORK STATUS</span>
             <span className="text-green-500 flex items-center gap-1"><Activity size={12}/> {partners.length + 1} ONLINE</span>

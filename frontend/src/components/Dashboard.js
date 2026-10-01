@@ -4,12 +4,14 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useSocket } from "./SocketProvider";
 import { LogOut, Plus, LogIn, Users } from "lucide-react";
+import ConfirmModal from "./ConfirmModal";
 
 export default function Dashboard({ user, onJoinRoom, onLogout }) {
   const { socket } = useSocket();
   const [rooms, setRooms] = useState([]);
   const [joinCode, setJoinCode] = useState("");
   const [createName, setCreateName] = useState("");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     if (!socket) return;
@@ -59,7 +61,7 @@ export default function Dashboard({ user, onJoinRoom, onLogout }) {
           <div className="text-gray-400 text-sm order-2 sm:order-1 text-center sm:text-left">
             LOGGED IN AS: <br className="sm:hidden" /><span className="text-white font-bold text-lg text-shadow-glow uppercase">{user.username}</span>
           </div>
-          <button onClick={onLogout} className="flex items-center gap-2 text-gray-500 hover:text-red-500 border border-gray-800 hover:border-red-500 px-4 py-2 rounded transition-colors order-1 sm:order-2 w-full sm:w-auto justify-center">
+          <button onClick={() => setShowLogoutConfirm(true)} className="flex items-center gap-2 text-gray-500 hover:text-red-500 border border-gray-800 hover:border-red-500 px-4 py-2 rounded transition-colors order-1 sm:order-2 w-full sm:w-auto justify-center">
             <LogOut size={16} /> LOGOUT
           </button>
         </div>
@@ -143,6 +145,18 @@ export default function Dashboard({ user, onJoinRoom, onLogout }) {
 
       </motion.div>
       </div>
+
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          onLogout();
+        }}
+        title="SYSTEM LOGOUT"
+        message="Are you sure you want to log out completely from Bro OS?"
+        confirmText="LOGOUT"
+      />
     </div>
   );
 }

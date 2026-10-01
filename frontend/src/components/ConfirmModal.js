@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
 
-export default function ConfirmModal({ isOpen, onClose, onConfirm, title, message }) {
+export default function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText = "DELETE", cancelText = "CANCEL" }) {
   if (!isOpen) return null;
 
   return (
@@ -30,13 +30,13 @@ export default function ConfirmModal({ isOpen, onClose, onConfirm, title, messag
               onClick={onClose}
               className="flex-1 bg-gray-900 border border-gray-700 hover:bg-gray-800 text-gray-300 py-2.5 rounded-lg text-xs font-bold tracking-widest transition-colors"
             >
-              CANCEL
+              {cancelText}
             </button>
             <button 
               onClick={() => { onConfirm(); onClose(); }}
               className="flex-1 bg-red-600 hover:bg-red-500 text-white py-2.5 rounded-lg text-xs font-bold tracking-widest transition-colors shadow-[0_0_15px_rgba(239,68,68,0.4)]"
             >
-              DELETE
+              {confirmText}
             </button>
           </div>
         </div>
