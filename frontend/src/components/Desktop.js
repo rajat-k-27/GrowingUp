@@ -22,6 +22,7 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
   const [showDrop, setShowDrop] = useState(false);
   const [showPing, setShowPing] = useState(false);
   const [showAppDrawer, setShowAppDrawer] = useState(false);
+  const [roomCreator, setRoomCreator] = useState(null);
   const { socket } = useSocket();
 
   useEffect(() => {
@@ -31,7 +32,16 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
         Notification.requestPermission();
       }
     }
-  }, []);
+
+    if (!socket) return;
+    socket.on("roomInfo", (info) => {
+      setRoomCreator(info.createdBy);
+    });
+
+    return () => {
+      socket.off("roomInfo");
+    };
+  }, [socket]);
 
   const icons = [
     { name: "DROP.exe", icon: Package, color: "text-blue-400", onClick: () => setShowDrop(true) },
@@ -167,7 +177,7 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
           )}
         </AnimatePresence>
       {/* Windows rendering */}
-      {activeWindow === "BRAIN" && <SharedBrain onClose={() => setActiveWindow(null)} identity={identity} />}
+      {activeWindow === "BRAIN" && <SharedBrain onClose={() => setActiveWindow(null)} identity={identity} roomCreator={roomCreator} />}
       {activeWindow === "MEMORIES" && <Memories onClose={() => setActiveWindow(null)} identity={identity} />}
       {activeWindow === "SYNC" && <Sync onClose={() => setActiveWindow(null)} identity={identity} />}
       {activeWindow === "DRAW" && <Draw onClose={() => setActiveWindow(null)} identity={identity} />}

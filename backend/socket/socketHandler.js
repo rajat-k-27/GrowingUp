@@ -55,8 +55,11 @@ module.exports = (io) => {
           { new: true } // returns the updated document
         );
         
-        if (room && room.members) {
-          io.to(socket.roomCode).emit("roomMembers", room.members);
+        if (room) {
+          if (room.members) {
+            io.to(socket.roomCode).emit("roomMembers", room.members);
+          }
+          socket.emit("roomInfo", { createdBy: room.createdBy });
         }
       } catch (e) { console.error("Error tracking room members", e); }
     });
@@ -489,9 +492,31 @@ module.exports = (io) => {
       } catch(e) { console.error(e); }
     });
 
+    socket.on("settleExpense", async (id) => {
+      try {
+        const exp = await Expense.findByIdAndUpdate(id, { settled: true }, { new: true });
+        io.to(socket.roomCode).emit("expenseUpdated", exp);
+        
+        // Also emit ledgerHistory to update balances
+        const history = await Expense.find({ roomCode: socket.roomCode }).sort({ createdAt: -1 }).lean();
+        io.to(socket.roomCode).emit("ledgerHistory", history);
+      } catch(e) { console.error(e); }
+    });
+
+    socket.on("markExpensePaid", async (id) => {
+      try {
+        const exp = await Expense.findByIdAndUpdate(
+          id, 
+          { $addToSet: { markedPaidBy: socket.username } }, 
+          { new: true }
+        );
+        io.to(socket.roomCode).emit("expenseUpdated", exp);
+      } catch(e) { console.error(e); }
+    });
+
     socket.on("settleDebts", async () => {
       try {
-        await Expense.updateMany({ roomCode: socket.roomCode, settled: false }, { settled: true });
+        await Expense.updateMany({ roomCode: socket.roomCode, paidBy: socket.username, settled: false }, { settled: true });
         const history = await Expense.find({ roomCode: socket.roomCode }).sort({ createdAt: -1 }).lean();
         io.to(socket.roomCode).emit("ledgerHistory", history);
       } catch(e) { console.error(e); }

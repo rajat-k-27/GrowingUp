@@ -6,7 +6,7 @@ import Window from "../Window";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSocket } from "../SocketProvider";
 
-export default function SharedBrain({ onClose, identity }) {
+export default function SharedBrain({ onClose, identity, roomCreator }) {
   const { socket } = useSocket();
   const [expenses, setExpenses] = useState([]);
   const [title, setTitle] = useState("");
@@ -25,6 +25,7 @@ export default function SharedBrain({ onClose, identity }) {
   // Empty array means "ALL"
   const [splitWithSelection, setSplitWithSelection] = useState([]); 
   const [showSplitModal, setShowSplitModal] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
 
   useEffect(() => {
     if (!socket) return;
@@ -75,8 +76,14 @@ export default function SharedBrain({ onClose, identity }) {
   }, [socket]);
 
   // Calculations only for UNSETTLED debts
-  const activeExpenses = expenses.filter(e => !e.settled);
-  const historyExpenses = expenses.filter(e => e.settled);
+  const involvedExpenses = expenses.filter(exp => {
+    if (exp.paidBy === identity) return true;
+    if (!exp.splitWith || exp.splitWith.length === 0) return true;
+    return exp.splitWith.includes(identity);
+  });
+  
+  const activeExpenses = involvedExpenses.filter(e => !e.settled);
+  const historyExpenses = involvedExpenses.filter(e => e.settled);
 
   const totalSpent = activeExpenses.reduce((sum, e) => sum + e.amount, 0);
 
@@ -88,14 +95,26 @@ export default function SharedBrain({ onClose, identity }) {
     let paid = 0;
     
     activeExpenses.forEach(exp => {
+      const splitters = exp.splitWith && exp.splitWith.length > 0 ? exp.splitWith : allKnownUsers;
+      const share = exp.amount / splitters.length;
+      
       if (exp.paidBy === user) {
         balance += exp.amount;
         paid += exp.amount;
+        
+        // Reduce creator's positive balance for everyone who has already paid
+        if (exp.markedPaidBy && exp.markedPaidBy.length > 0) {
+          balance -= (share * exp.markedPaidBy.length);
+        }
       }
       
-      const splitters = exp.splitWith && exp.splitWith.length > 0 ? exp.splitWith : allKnownUsers;
       if (splitters.includes(user)) {
-        balance -= (exp.amount / splitters.length);
+        balance -= share;
+        
+        // If user paid their share, cancel out this debt
+        if (exp.markedPaidBy && exp.markedPaidBy.includes(user)) {
+          balance += share;
+        }
       }
     });
     
@@ -103,6 +122,34 @@ export default function SharedBrain({ onClose, identity }) {
   }).filter(b => b.paid !== 0 || Math.abs(b.balance) > 0.01).sort((a, b) => b.balance - a.balance);
 
   const myBalance = balances.find(b => b.name === identity)?.balance || 0;
+
+  // Calculate pairwise net debts specifically for the current user
+  const pairwise = {};
+  activeExpenses.forEach(exp => {
+    const splitters = exp.splitWith && exp.splitWith.length > 0 ? exp.splitWith : allKnownUsers;
+    const share = exp.amount / splitters.length;
+    
+    splitters.forEach(splitter => {
+      if (splitter === exp.paidBy) return;
+      if (exp.markedPaidBy && exp.markedPaidBy.includes(splitter)) return;
+      
+      if (!pairwise[splitter]) pairwise[splitter] = {};
+      pairwise[splitter][exp.paidBy] = (pairwise[splitter][exp.paidBy] || 0) + share;
+    });
+  });
+
+  const myDebts = [];
+  const myCredits = [];
+  
+  allKnownUsers.forEach(otherUser => {
+    if (otherUser === identity) return;
+    const iOweThem = (pairwise[identity] && pairwise[identity][otherUser]) || 0;
+    const theyOweMe = (pairwise[otherUser] && pairwise[otherUser][identity]) || 0;
+    
+    const net = theyOweMe - iOweThem;
+    if (net > 0.01) myCredits.push({ name: otherUser, amount: net });
+    else if (net < -0.01) myDebts.push({ name: otherUser, amount: Math.abs(net) });
+  });
 
   const toggleSplitUser = (user) => {
     let current = splitWithSelection.length === 0 ? [...allKnownUsers] : [...splitWithSelection];
@@ -158,6 +205,10 @@ export default function SharedBrain({ onClose, identity }) {
     socket.emit("deleteExpense", id);
   };
 
+  const handleSettleExpense = (id) => {
+    socket.emit("settleExpense", id);
+  };
+
   return (
     <Window title="LEDGER.exe" onClose={onClose} icon={Wallet}>
       <div className="flex flex-col h-full bg-[#050508] p-4 font-mono overflow-y-auto hide-scrollbar relative">
@@ -167,8 +218,8 @@ export default function SharedBrain({ onClose, identity }) {
           <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6">
             <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} className="bg-red-950/40 border border-red-500/50 p-6 rounded-3xl w-full text-center shadow-[0_0_50px_rgba(239,68,68,0.2)]">
               <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4 animate-pulse drop-shadow-[0_0_15px_rgba(239,68,68,0.8)]" />
-              <h2 className="text-xl font-black text-red-400 mb-2 tracking-[0.2em]">INITIATE SETTLEMENT?</h2>
-              <p className="text-xs text-red-200/60 mb-8 font-sans">This will mark all active debts as SETTLED and archive them. Ensure real-world transactions are complete.</p>
+              <h2 className="text-xl font-black text-red-400 mb-2 tracking-[0.2em]">SETTLE MY DEBTS?</h2>
+              <p className="text-xs text-red-200/60 mb-8 font-sans">This will mark all active debts created by YOU as SETTLED and archive them. Ensure real-world transactions are complete.</p>
               <div className="flex gap-4">
                 <button onClick={() => setShowSettleModal(false)} className="flex-1 p-3 bg-white/5 hover:bg-white/10 transition-colors rounded-xl text-white font-bold tracking-widest text-sm">CANCEL</button>
                 <button onClick={handleSettle} className="flex-1 p-3 bg-red-600 hover:bg-red-500 transition-colors rounded-xl text-white font-black tracking-widest text-sm shadow-[0_0_20px_rgba(220,38,38,0.4)]">CONFIRM</button>
@@ -271,7 +322,7 @@ export default function SharedBrain({ onClose, identity }) {
             })}
           </div>
           
-          <div className="flex justify-between mt-6 pt-4 border-t border-white/5">
+          <div className="flex justify-between mt-6 pt-4 border-t border-white/5 mb-4">
             <div className="text-left">
               <p className="text-[9px] text-gray-500 tracking-wider">TOTAL ACTIVE</p>
               <p className="text-2xl font-black text-white tracking-widest">₹{totalSpent.toFixed(0)}</p>
@@ -284,12 +335,30 @@ export default function SharedBrain({ onClose, identity }) {
             </div>
           </div>
           
-          {activeExpenses.length > 0 && (
+          {(myDebts.length > 0 || myCredits.length > 0) && (
+            <div className="pt-4 border-t border-white/5 flex flex-col gap-2">
+              <p className="text-[9px] text-gray-500 tracking-[0.2em] font-bold text-center mb-1">INDIVIDUAL BREAKDOWN</p>
+              {myDebts.map((d, i) => (
+                <div key={i} className="flex justify-between items-center text-[10px] bg-red-500/10 p-2.5 rounded-xl border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.05)]">
+                  <span className="text-gray-400">YOU OWE <strong className="text-white tracking-wider">{d.name}</strong></span>
+                  <span className="text-red-400 font-black tracking-widest">₹{d.amount.toFixed(0)}</span>
+                </div>
+              ))}
+              {myCredits.map((c, i) => (
+                <div key={i} className="flex justify-between items-center text-[10px] bg-green-500/10 p-2.5 rounded-xl border border-green-500/20 shadow-[0_0_10px_rgba(74,222,128,0.05)]">
+                  <span className="text-gray-400"><strong className="text-white tracking-wider">{c.name}</strong> OWES YOU</span>
+                  <span className="text-green-400 font-black tracking-widest">₹{c.amount.toFixed(0)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {activeExpenses.some(e => e.paidBy === identity) && (
             <button 
               onClick={() => setShowSettleModal(true)}
               className="mt-5 w-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 py-3.5 rounded-2xl text-[10px] font-black tracking-[0.2em] transition-all active:scale-95 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
             >
-              SETTLE BALANCES
+              SETTLE MY DEBTS
             </button>
           )}
         </div>
@@ -360,13 +429,36 @@ export default function SharedBrain({ onClose, identity }) {
                         <span className="hidden sm:inline mx-1">•</span> 
                         <span className="truncate">Split: <span className="text-purple-400">{exp.splitWith && exp.splitWith.length > 0 ? exp.splitWith.join(", ") : "ALL"}</span></span>
                       </p>
+                      {exp.markedPaidBy && exp.markedPaidBy.length > 0 && (
+                        <p className="text-[9px] text-green-400 mt-1 font-bold tracking-widest">
+                          Paid by: {exp.markedPaidBy.join(", ")}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 mt-2 sm:mt-0">
                       <span className="font-black text-white tracking-widest text-lg shrink-0">₹{exp.amount}</span>
-                      <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={()=>startEditing(exp)} className="text-gray-400 hover:text-blue-400 bg-black/40 hover:bg-blue-500/10 p-2 rounded-lg transition-colors"><Pencil size={14}/></button>
-                        <button onClick={()=>handleDelete(exp._id)} className="text-gray-400 hover:text-red-400 bg-black/40 hover:bg-red-500/10 p-2 rounded-lg transition-colors"><Trash2 size={14}/></button>
-                      </div>
+                      {exp.paidBy === identity && (
+                        <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={()=>startEditing(exp)} className="text-gray-400 hover:text-blue-400 bg-black/40 hover:bg-blue-500/10 p-2 rounded-lg transition-colors" title="Edit"><Pencil size={14}/></button>
+                          <button onClick={()=>handleDelete(exp._id)} className="text-gray-400 hover:text-red-400 bg-black/40 hover:bg-red-500/10 p-2 rounded-lg transition-colors" title="Delete"><Trash2 size={14}/></button>
+                        </div>
+                      )}
+                      {exp.paidBy !== identity && (
+                        <div className="flex ml-2">
+                          {exp.markedPaidBy && exp.markedPaidBy.includes(identity) ? (
+                            <span className="text-[10px] bg-green-500/10 text-green-500 px-3 py-1.5 rounded-lg border border-green-500/30 font-black tracking-widest flex items-center gap-1">
+                              <Check size={12}/> PAID
+                            </span>
+                          ) : (
+                            <button 
+                              onClick={() => socket.emit("markExpensePaid", exp._id)} 
+                              className="text-[10px] bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-white border border-green-500/50 px-4 py-1.5 rounded-lg transition-all font-black tracking-widest shadow-[0_0_15px_rgba(74,222,128,0.3)] active:scale-95"
+                            >
+                              I PAID
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -380,9 +472,15 @@ export default function SharedBrain({ onClose, identity }) {
         
         {/* History List */}
         {historyExpenses.length > 0 && (
-          <div className="flex-1 shrink-0">
-            <h3 className="text-[10px] text-gray-600 tracking-[0.2em] font-bold mb-3 pl-1">SETTLED ARCHIVE</h3>
-            {historyExpenses.map(exp => (
+          <div className="flex-1 shrink-0 mt-4">
+            <button 
+              onClick={() => setShowArchive(!showArchive)}
+              className="w-full text-left text-[10px] text-gray-500 hover:text-gray-300 tracking-[0.2em] font-bold mb-3 pl-1 flex justify-between items-center"
+            >
+              <span>SETTLED ARCHIVE ({historyExpenses.length})</span>
+              <span>{showArchive ? 'HIDE' : 'SHOW'}</span>
+            </button>
+            {showArchive && historyExpenses.map(exp => (
               <div key={exp._id} className="bg-black/30 border border-white/5 rounded-xl p-3 mb-2 opacity-50 flex justify-between items-center hover:opacity-100 transition-opacity">
                 <div>
                   <p className="text-xs font-bold text-gray-400 line-through tracking-wider">{exp.title}</p>

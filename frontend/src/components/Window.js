@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useDragControls } from "framer-motion";
 import { X, Minus, Square, Copy } from "lucide-react";
 
 export default function Window({ title, onClose, children, icon: Icon, width = "max-w-2xl" }) {
   const [isMaximized, setIsMaximized] = useState(false);
+  const dragControls = useDragControls();
 
   return (
     <div className={`z-[100] flex pointer-events-none ${
@@ -14,6 +15,10 @@ export default function Window({ title, onClose, children, icon: Icon, width = "
         : "absolute inset-0 items-center justify-center p-4 pb-24 sm:p-6 sm:pb-6"
     }`}>
       <motion.div
+        drag={!isMaximized}
+        dragControls={dragControls}
+        dragMomentum={false}
+        dragListener={false}
         initial={{ scale: 0.95, opacity: 0, y: 10 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 10 }}
@@ -25,12 +30,15 @@ export default function Window({ title, onClose, children, icon: Icon, width = "
         }`}
       >
         {/* Title Bar (Hidden when Maximized on ALL devices) */}
-        <div className={`bg-[#111] border-b border-gray-800 p-2 items-center justify-between select-none shrink-0 ${isMaximized ? 'hidden' : 'flex'}`}>
+        <div 
+          className={`bg-[#111] border-b border-gray-800 p-2 items-center justify-between select-none shrink-0 ${isMaximized ? 'hidden' : 'flex'} cursor-move touch-none`}
+          onPointerDown={(e) => dragControls.start(e)}
+        >
           <div className="flex items-center gap-2 pl-2 text-gray-400 font-mono text-sm">
             {Icon && <Icon size={14} />}
             {title}
           </div>
-          <div className="flex items-center gap-2 pr-2">
+          <div className="flex items-center gap-2 pr-2" onPointerDown={(e) => e.stopPropagation()}>
             <button className="text-gray-500 hover:text-white transition-colors cursor-pointer"><Minus size={14} /></button>
             <button 
               onClick={() => setIsMaximized(!isMaximized)}
