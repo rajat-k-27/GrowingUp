@@ -27,6 +27,12 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e7 // 10MB
 });
 
+// Configure Redis Adapter for horizontal scaling
+const { createAdapter } = require('@socket.io/redis-adapter');
+const pubClient = require('./config/redis');
+const subClient = pubClient.duplicate();
+io.adapter(createAdapter(pubClient, subClient));
+
 socketHandler(io);
 
 // Start Server AFTER connecting to DB

@@ -23,28 +23,27 @@ module.exports = (io) => {
     next();
   });
 
-  const rooms = {};
-  const roomSyncStates = {};
 
   io.on('connection', (socket) => {
     console.log("A user connected:", socket.id);
 
     socket.on("joinRoom", async ({ username, roomCode }) => {
       // Leave old room if exists
-      if (socket.roomCode && socket.username && rooms[socket.roomCode]) {
+      if (socket.roomCode && socket.username) {
         socket.leave(socket.roomCode);
-        rooms[socket.roomCode].delete(socket.username);
-        io.to(socket.roomCode).emit("roomUsers", Array.from(rooms[socket.roomCode]));
+        await redis.srem(`room:${socket.roomCode}`, socket.username);
+        const users = await redis.smembers(`room:${socket.roomCode}`);
+        io.to(socket.roomCode).emit("roomUsers", users);
       }
 
       socket.username = username;
       socket.roomCode = roomCode || "DEFAULT";
       socket.join(socket.roomCode);
       
-      if (!rooms[socket.roomCode]) rooms[socket.roomCode] = new Set();
-      rooms[socket.roomCode].add(username);
+      await redis.sadd(`room:${socket.roomCode}`, username);
+      const updatedUsers = await redis.smembers(`room:${socket.roomCode}`);
       
-      io.to(socket.roomCode).emit("roomUsers", Array.from(rooms[socket.roomCode]));
+      io.to(socket.roomCode).emit("roomUsers", updatedUsers);
 
       try {
         const { RoomData } = require('../models');
@@ -172,11 +171,12 @@ module.exports = (io) => {
       } catch(e) { console.error(e); }
     });
 
-    socket.on("leaveRoom", () => {
-      if (socket.roomCode && socket.username && rooms[socket.roomCode]) {
+    socket.on("leaveRoom", async () => {
+      if (socket.roomCode && socket.username) {
         socket.leave(socket.roomCode);
-        rooms[socket.roomCode].delete(socket.username);
-        io.to(socket.roomCode).emit("roomUsers", Array.from(rooms[socket.roomCode]));
+        await redis.srem(`room:${socket.roomCode}`, socket.username);
+        const users = await redis.smembers(`room:${socket.roomCode}`);
+        io.to(socket.roomCode).emit("roomUsers", users);
         socket.roomCode = null;
       }
     });
@@ -455,9 +455,10 @@ module.exports = (io) => {
       } catch (e) { console.error(e); }
     });
 
-    socket.on("getRoomUsers", () => {
-      if (rooms[socket.roomCode]) {
-        socket.emit("roomUsers", Array.from(rooms[socket.roomCode]));
+    socket.on("getRoomUsers", async () => {
+      if (socket.roomCode) {
+        const users = await redis.smembers(`room:${socket.roomCode}`);
+        socket.emit("roomUsers", users);
       }
     });
 
@@ -523,12 +524,11 @@ module.exports = (io) => {
     });
 
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       if (socket.roomCode && socket.username) {
-        if (rooms[socket.roomCode]) {
-          rooms[socket.roomCode].delete(socket.username);
-          io.to(socket.roomCode).emit("roomUsers", Array.from(rooms[socket.roomCode]));
-        }
+        await redis.srem(`room:${socket.roomCode}`, socket.username);
+        const users = await redis.smembers(`room:${socket.roomCode}`);
+        io.to(socket.roomCode).emit("roomUsers", users);
       }
       console.log("Client disconnected:", socket.id);
     });

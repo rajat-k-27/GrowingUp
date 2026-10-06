@@ -1,8 +1,7 @@
 const Redis = require('ioredis');
 
-// Connects to local Redis server automatically (127.0.0.1:6379)
-// In production, you would pass your cloud Redis URL here: new Redis(process.env.REDIS_URL)
-const redis = new Redis();
+// Connects to Cloud Redis if REDIS_URL exists, otherwise defaults to local
+const redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379');
 
 redis.on('connect', () => {
   console.log('Redis connected successfully!');
