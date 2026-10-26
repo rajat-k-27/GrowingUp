@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const memorySchema = new mongoose.Schema({
-  roomCode: String,
+  roomCode: { type: String, index: true },
   id: String,
   author: String,
   description: String,

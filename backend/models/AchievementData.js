@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const achievementSchema = new mongoose.Schema({
-  roomCode: String,
+  roomCode: { type: String, index: true },
   id: String,
   title: String,
   desc: String,

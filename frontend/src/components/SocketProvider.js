@@ -21,9 +21,10 @@ export const SocketProvider = ({ children }) => {
       : "http://localhost:5000";
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || defaultBackend;
     
-    // Pass the secure token during handshake
+    // Pass the secure token during handshake and force websocket for instant connection
     const socketInstance = io(backendUrl, {
-      auth: { token }
+      auth: { token },
+      transports: ["websocket"]
     });
 
     socketInstance.on("connect", () => setIsConnected(true));

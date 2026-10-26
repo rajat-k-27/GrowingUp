@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const chatSchema = new mongoose.Schema({
-  roomCode: String,
+  roomCode: { type: String, index: true },
   sender: String,
   text: String,
   mediaUrl: String,

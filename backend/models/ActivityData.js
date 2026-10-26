@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const activitySchema = new mongoose.Schema({
-  roomCode: String,
+  roomCode: { type: String, index: true },
   sender: String,
   text: String,
   type: String,

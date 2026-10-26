@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const secretSchema = new mongoose.Schema({
-  roomCode: String,
+  roomCode: { type: String, index: true },
   pin: String,
   sender: String,
   text: String,

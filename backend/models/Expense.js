@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const expenseSchema = new mongoose.Schema({
-  roomCode: String,
+  roomCode: { type: String, index: true },
   title: String,
   amount: Number,
   paidBy: String,
