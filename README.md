@@ -67,31 +67,31 @@ flowchart TB
     end
 
     subgraph Gateway["Real-Time Gateway Layer (Render)"]
-        NodeServer1["Node.js / Express Instance #1\n(Socket.IO Gateway)"]
-        NodeServer2["Node.js / Express Instance #2\n(Socket.IO Gateway)"]
+        NodeServer1["Node.js / Express Instance #1<br/>(Socket.IO Gateway)"]
+        NodeServer2["Node.js / Express Instance #2<br/>(Socket.IO Gateway)"]
     end
 
     subgraph CacheCluster["Distributed In-Memory Layer (Upstash Redis TLS)"]
-        RedisPubSub["Redis Pub/Sub Bus\n(@socket.io/redis-adapter)"]
-        RedisMemory["L1 In-Memory Cache\n- Stroke History (Lists)\n- Active Presence (Sets)\n- Query TTLs (Strings)\n- Sliding-Window Rate Limits"]
+        RedisPubSub["Redis Pub/Sub Bus<br/>(@socket.io/redis-adapter)"]
+        RedisMemory["L1 In-Memory Cache<br/>- Stroke History (Lists)<br/>- Active Presence (Sets)<br/>- Query TTLs (Strings)<br/>- Sliding-Window Rate Limits"]
     end
 
     subgraph StorageTier["Persistence & Asset Infrastructure"]
-        MongoDB[("MongoDB Atlas\n- User / Room Documents\n- Chat & Activity Archives\n- Ledger Records\n- Lean Indexes")]
-        CloudinaryCDN[("Cloudinary Global CDN\n- Auto Format & Compression\n- Base64 Buffer Offloading")]
+        MongoDB[("MongoDB Atlas<br/>- User / Room Documents<br/>- Chat & Activity Archives<br/>- Ledger Records<br/>- Lean Indexes")]
+        CloudinaryCDN[("Cloudinary Global CDN<br/>- Auto Format & Compression<br/>- Base64 Buffer Offloading")]
     end
 
-    ClientA <-->|HTTPS / WSS Transport| VercelEdge
-    ClientB <-->|HTTPS / WSS Transport| VercelEdge
+    ClientA <-->|"HTTPS / WSS Transport"| VercelEdge
+    ClientB <-->|"HTTPS / WSS Transport"| VercelEdge
 
-    ClientA <==>|"WebSocket (Full-Duplex)"| NodeServer1
-    ClientB <==>|"WebSocket (Full-Duplex)"| NodeServer2
+    ClientA <-->|"WebSocket (Full-Duplex)"| NodeServer1
+    ClientB <-->|"WebSocket (Full-Duplex)"| NodeServer2
 
-    NodeServer1 <-->|Pub/Sub Sync| RedisPubSub
-    NodeServer2 <-->|Pub/Sub Sync| RedisPubSub
+    NodeServer1 <-->|"Pub/Sub Sync"| RedisPubSub
+    NodeServer2 <-->|"Pub/Sub Sync"| RedisPubSub
 
-    NodeServer1 <-->|O(1) Atomic Operations| RedisMemory
-    NodeServer2 <-->|O(1) Atomic Operations| RedisMemory
+    NodeServer1 <-->|"O(1) Atomic Operations"| RedisMemory
+    NodeServer2 <-->|"O(1) Atomic Operations"| RedisMemory
 
     NodeServer1 -.->|"Async Fire-and-Forget Persistence"| MongoDB
     NodeServer2 -.->|"Async Fire-and-Forget Persistence"| MongoDB
