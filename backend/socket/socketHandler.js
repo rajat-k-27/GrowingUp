@@ -620,17 +620,38 @@ module.exports = (io) => {
       } catch(e) { console.error(e); }
     });
 
-    socket.on("disconnect", async () => {
-      if (socket.roomCode && socket.username) {
-        try {
-          await redis.srem(`room:${socket.roomCode}`, socket.username);
-          const users = await redis.smembers(`room:${socket.roomCode}`);
-          io.to(socket.roomCode).emit("roomUsers", users);
-        } catch (err) {
-          console.error("Redis disconnect error:", err);
-        }
+    socket.on("disconnect", async (reason) => {
+      const room = socket.roomCode;
+      const user = socket.username;
+      console.log(`Client disconnected: ${socket.id} (user: ${user || 'anonymous'}, room: ${room || 'none'}, reason: ${reason})`);
+
+      if (room && user) {
+        // 3-second grace period: prevents active partners from flickering to INACTIVE
+        // if the client is reconnecting or has multiple tabs open
+        setTimeout(async () => {
+          const roomSockets = io.sockets.adapter.rooms.get(room);
+          let userStillInRoom = false;
+          if (roomSockets) {
+            for (const sockId of roomSockets) {
+              const sock = io.sockets.sockets.get(sockId);
+              if (sock && sock.username === user) {
+                userStillInRoom = true;
+                break;
+              }
+            }
+          }
+
+          if (!userStillInRoom) {
+            try {
+              await redis.srem(`room:${room}`, user);
+              const users = await redis.smembers(`room:${room}`);
+              io.to(room).emit("roomUsers", users);
+            } catch (err) {
+              console.error("Redis disconnect error:", err);
+            }
+          }
+        }, 3000);
       }
-      console.log("Client disconnected:", socket.id);
     });
   });
 };

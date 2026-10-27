@@ -27,8 +27,8 @@ const io = new Server(server, {
     origin: '*',
   },
   maxHttpBufferSize: 5e6, // 5MB limit
-  pingInterval: 10000,
-  pingTimeout: 60000 // 60s timeout for mobile hotspot/jitter resilience
+  pingInterval: 15000, // Send heartbeat every 15s to keep Render/Cloudflare proxy alive
+  pingTimeout: 10000 // 10s timeout for response
 });
 
 // Configure Redis Adapter for multi-instance scaling if explicitly requested
