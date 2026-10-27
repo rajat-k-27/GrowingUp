@@ -4,6 +4,7 @@ const redisOptions = {
   maxRetriesPerRequest: 3,
   enableReadyCheck: false,
   keepAlive: 10000,
+  enableOfflineQueue: false, // Prevents buffering thousands of commands in memory during network jitter
   retryStrategy(times) {
     return Math.min(times * 50, 2000);
   }

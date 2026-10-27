@@ -249,8 +249,10 @@ module.exports = (io) => {
           mediaType = uploadRes.resource_type;
         } catch(e) {
           console.error("Cloudinary upload failed for drop:", e);
-          mediaUrl = base64Data;
-          mediaType = base64Data.startsWith("data:video") || base64Data.startsWith("data:audio") ? "video" : "image";
+          if (base64Data && base64Data.length < 500000) {
+            mediaUrl = base64Data;
+            mediaType = base64Data.startsWith("data:video") || base64Data.startsWith("data:audio") ? "video" : "image";
+          }
         }
       }
 
@@ -329,8 +331,10 @@ module.exports = (io) => {
           data.mediaType = mediaType;
         } catch(e) {
           console.error("Cloudinary upload failed for chat:", e);
-          data.mediaUrl = base64Data;
-          data.mediaType = base64Data.startsWith("data:video") || base64Data.startsWith("data:audio") ? "video" : "image";
+          if (base64Data && base64Data.length < 500000) {
+            data.mediaUrl = base64Data;
+            data.mediaType = base64Data.startsWith("data:video") || base64Data.startsWith("data:audio") ? "video" : "image";
+          }
         }
       }
 
@@ -362,8 +366,9 @@ module.exports = (io) => {
       if (!room) return;
       socket.to(room).emit("draw_line", data);
       
-      // Store vector line segment in Redis (NO repetitive expire per point)
+      // Store vector line segment in Redis and cap to last 1000 lines to prevent memory bloat
       redis.rpush(`draw:${room}`, JSON.stringify(data)).catch(() => {});
+      redis.ltrim(`draw:${room}`, -1000, -1).catch(() => {});
     });
 
     socket.on("draw_end", (data) => {
@@ -377,7 +382,7 @@ module.exports = (io) => {
       const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
       if (!room) return;
       try {
-        const lines = await redis.lrange(`draw:${room}`, 0, -1);
+        const lines = await redis.lrange(`draw:${room}`, -1000, -1);
         if (lines && lines.length > 0) {
           const parsedLines = lines.map(l => {
             try { return JSON.parse(l); } catch(err) { return null; }
@@ -391,23 +396,27 @@ module.exports = (io) => {
       }
     });
 
-    socket.on("draw_clear", (data) => {
+    socket.on("draw_clear", async (data) => {
       const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
       if (!room) return;
       socket.to(room).emit("draw_clear", data);
       
       if (data && data.sender) {
-        redis.lrange(`draw:${room}`, 0, -1).then(lines => {
+        try {
+          const lines = await redis.lrange(`draw:${room}`, 0, -1);
           const parsedLines = lines.map(l => {
             try { return JSON.parse(l); } catch(err) { return null; }
           }).filter(l => l && l.sender !== data.sender);
-          redis.del(`draw:${room}`).then(() => {
-            if (parsedLines.length > 0) {
-              const stringified = parsedLines.map(l => JSON.stringify(l));
-              redis.rpush(`draw:${room}`, ...stringified).catch(() => {});
+          await redis.del(`draw:${room}`);
+          if (parsedLines.length > 0) {
+            const stringified = parsedLines.map(l => JSON.stringify(l));
+            for (let i = 0; i < stringified.length; i += 200) {
+              await redis.rpush(`draw:${room}`, ...stringified.slice(i, i + 200));
             }
-          }).catch(() => {});
-        }).catch(() => {});
+          }
+        } catch(e) {
+          console.error("Error in draw_clear:", e);
+        }
       } else {
         redis.del(`draw:${room}`).catch(() => {});
       }

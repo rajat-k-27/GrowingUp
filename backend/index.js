@@ -26,21 +26,32 @@ const io = new Server(server, {
   cors: {
     origin: '*',
   },
-  maxHttpBufferSize: 1e7, // 10MB
+  maxHttpBufferSize: 5e6, // 5MB limit
   pingInterval: 10000,
   pingTimeout: 60000 // 60s timeout for mobile hotspot/jitter resilience
 });
 
-// Configure Redis Adapter for horizontal scaling
-const { createAdapter } = require('@socket.io/redis-adapter');
-const pubClient = require('./config/redis');
-const subClient = pubClient.duplicate();
+// Configure Redis Adapter for multi-instance scaling if explicitly requested
+// On single-instance (Render default, WEB_CONCURRENCY=1), native in-memory adapter
+// provides 0ms latency, zero Upstash bandwidth, and eliminates out-of-memory buffer leaks!
+if (process.env.ENABLE_REDIS_ADAPTER === 'true') {
+  try {
+    const { createAdapter } = require('@socket.io/redis-adapter');
+    const pubClient = require('./config/redis');
+    const subClient = pubClient.duplicate();
 
-subClient.on('error', (err) => {
-  console.error('Redis subClient error:', err.message || err);
-});
+    subClient.on('error', (err) => {
+      console.error('Redis subClient error:', err.message || err);
+    });
 
-io.adapter(createAdapter(pubClient, subClient));
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log('Socket.IO Redis adapter enabled for multi-instance scaling.');
+  } catch (err) {
+    console.error('Failed to initialize Redis adapter:', err);
+  }
+} else {
+  console.log('Socket.IO running in high-performance native in-memory mode.');
+}
 
 socketHandler(io);
 
