@@ -26,13 +26,20 @@ const io = new Server(server, {
   cors: {
     origin: '*',
   },
-  maxHttpBufferSize: 1e7 // 10MB
+  maxHttpBufferSize: 1e7, // 10MB
+  pingInterval: 10000,
+  pingTimeout: 60000 // 60s timeout for mobile hotspot/jitter resilience
 });
 
 // Configure Redis Adapter for horizontal scaling
 const { createAdapter } = require('@socket.io/redis-adapter');
 const pubClient = require('./config/redis');
 const subClient = pubClient.duplicate();
+
+subClient.on('error', (err) => {
+  console.error('Redis subClient error:', err.message || err);
+});
+
 io.adapter(createAdapter(pubClient, subClient));
 
 socketHandler(io);

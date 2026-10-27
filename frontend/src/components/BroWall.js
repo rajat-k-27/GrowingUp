@@ -22,7 +22,7 @@ export function getRelativeTime(dateInput) {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
-export default function BroWall({ identity }) {
+export default function BroWall({ identity, roomCode }) {
   const { socket } = useSocket();
   const [activities, setActivities] = useState([
     { id: 1, text: "System initialized.", time: new Date().toLocaleTimeString(), sender: "SYSTEM", type: "system" }
@@ -33,7 +33,12 @@ export default function BroWall({ identity }) {
   useEffect(() => {
     if (!socket) return;
 
-    socket.emit("getActivityHistory");
+    const fetchHistory = () => {
+      socket.emit("getActivityHistory", roomCode);
+    };
+
+    fetchHistory();
+    socket.on("connect", fetchHistory);
 
     socket.on("activityHistory", (history) => {
       // Map DB schema to component state
@@ -88,6 +93,7 @@ export default function BroWall({ identity }) {
     });
 
     return () => {
+      socket.off("connect", fetchHistory);
       socket.off("activityHistory");
       socket.off("newDrop");
       socket.off("dropDeleted");
@@ -95,7 +101,7 @@ export default function BroWall({ identity }) {
       socket.off("hereUpdate");
       socket.off("statusUpdate");
     };
-  }, [socket]);
+  }, [socket, roomCode]);
 
   return (
     <>
@@ -154,7 +160,7 @@ export default function BroWall({ identity }) {
         onClose={() => setDeleteConfirmId(null)}
         onConfirm={() => {
           if (socket && deleteConfirmId) {
-            socket.emit("deleteDrop", deleteConfirmId);
+            socket.emit("deleteDrop", { id: deleteConfirmId, roomCode });
           }
         }}
         title="DELETE DROP"

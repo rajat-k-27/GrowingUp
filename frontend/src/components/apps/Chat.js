@@ -23,7 +23,7 @@ const formatMessageTime = (dateInput) => {
   return format(new Date(dateInput), 'h:mm a');
 };
 
-export default function Chat({ onClose, identity }) {
+export default function Chat({ onClose, identity, roomCode }) {
   const { socket } = useSocket();
   
   const [messages, setMessages] = useState([
@@ -49,17 +49,23 @@ export default function Chat({ onClose, identity }) {
     const handleChatHistory = (history) => {
       setMessages(history);
     };
+
+    const fetchChatHistory = () => {
+      socket.emit("getChatHistory", roomCode);
+    };
     
     socket.on("newChatMessage", handleNewMessage);
     socket.on("chatHistory", handleChatHistory);
+    socket.on("connect", fetchChatHistory);
 
-    socket.emit("getChatHistory");
+    fetchChatHistory();
 
     return () => {
       socket.off("newChatMessage", handleNewMessage);
       socket.off("chatHistory", handleChatHistory);
+      socket.off("connect", fetchChatHistory);
     };
-  }, [socket]);
+  }, [socket, roomCode]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -149,7 +155,7 @@ export default function Chat({ onClose, identity }) {
     e.preventDefault();
     if ((!input.trim() && !mediaBase64) || !socket) return;
     
-    const newMsg = { id: Date.now(), sender: identity, text: input, mediaBase64 };
+    const newMsg = { id: Date.now(), sender: identity, text: input, mediaBase64, roomCode };
     socket.emit("chatMessage", newMsg);
     
     setInput("");

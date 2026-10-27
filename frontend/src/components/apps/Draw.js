@@ -5,7 +5,7 @@ import Window from "../Window";
 import { Palette, Trash2, Eraser, Pen, Download } from "lucide-react";
 import { useSocket } from "../SocketProvider";
 
-export default function Draw({ onClose, identity }) {
+export default function Draw({ onClose, identity, roomCode }) {
   const { socket } = useSocket();
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -15,6 +15,8 @@ export default function Draw({ onClose, identity }) {
   const [isEraser, setIsEraser] = useState(false);
   
   const lastPos = useRef({ x: 0, y: 0 });
+  const lastNetworkPos = useRef({ x: 0, y: 0 });
+  const lastEmitTime = useRef(0);
   const linesRef = useRef([]); // Stores all drawn lines { start, end, color, size, sender }
 
   const redrawCanvas = () => {
@@ -66,23 +68,29 @@ export default function Draw({ onClose, identity }) {
     };
 
     const handleDrawState = (lines) => {
-      linesRef.current = lines;
+      linesRef.current = Array.isArray(lines) ? lines : [];
       redrawCanvas();
+    };
+
+    const fetchDrawState = () => {
+      socket.emit("get_draw_state", roomCode);
     };
 
     socket.on("draw_line", handleDrawLine);
     socket.on("draw_clear", handleDrawClear);
     socket.on("draw_state", handleDrawState);
+    socket.on("connect", fetchDrawState);
     
     // Fetch persistent drawing state from Redis on mount
-    socket.emit("get_draw_state");
+    fetchDrawState();
     
     return () => {
       socket.off("draw_line", handleDrawLine);
       socket.off("draw_clear", handleDrawClear);
       socket.off("draw_state", handleDrawState);
+      socket.off("connect", fetchDrawState);
     };
-  }, [socket]);
+  }, [socket, roomCode]);
 
   // Handle dynamic canvas sizing
   useEffect(() => {
@@ -148,7 +156,10 @@ export default function Draw({ onClose, identity }) {
   const startDrawing = (e) => {
     if (e.cancelable) e.preventDefault();
     setIsDrawing(true);
-    lastPos.current = getCoordinates(e);
+    const pos = getCoordinates(e);
+    lastPos.current = pos;
+    lastNetworkPos.current = pos;
+    lastEmitTime.current = Date.now();
   };
 
   const draw = (e) => {
@@ -159,6 +170,7 @@ export default function Draw({ onClose, identity }) {
     const strokeColor = isEraser ? "#ffffff" : color;
     const strokeSize = isEraser ? 20 : brushSize;
     
+    // 1. Immediate local rendering (silky smooth 60-120fps, 0ms lag)
     drawLine(lastPos.current, currentPos, strokeColor, strokeSize);
     
     const lineData = {
@@ -166,21 +178,52 @@ export default function Draw({ onClose, identity }) {
       end: currentPos,
       color: strokeColor,
       size: strokeSize,
-      sender: identity
+      sender: identity,
+      roomCode
     };
     
     linesRef.current.push(lineData);
-    
-    if (socket) {
-      socket.emit("draw_line", lineData);
-    }
-    
     lastPos.current = currentPos;
+
+    // 2. Network emit throttled to ~40fps (every 25ms)
+    // Connects from lastNetworkPos to currentPos so no segments are broken or lost
+    const now = Date.now();
+    if (now - lastEmitTime.current >= 25 && socket) {
+      socket.emit("draw_line", {
+        start: lastNetworkPos.current,
+        end: currentPos,
+        color: strokeColor,
+        size: strokeSize,
+        sender: identity,
+        roomCode
+      });
+      lastNetworkPos.current = currentPos;
+      lastEmitTime.current = now;
+    }
   };
 
   const stopDrawing = (e) => {
     if (e.cancelable) e.preventDefault();
+    if (!isDrawing) return;
     setIsDrawing(false);
+
+    // Flush any remaining stroke delta to network
+    if (socket && lastNetworkPos.current && lastPos.current) {
+      if (lastNetworkPos.current.x !== lastPos.current.x || lastNetworkPos.current.y !== lastPos.current.y) {
+        const strokeColor = isEraser ? "#ffffff" : color;
+        const strokeSize = isEraser ? 20 : brushSize;
+        socket.emit("draw_line", {
+          start: lastNetworkPos.current,
+          end: lastPos.current,
+          color: strokeColor,
+          size: strokeSize,
+          sender: identity,
+          roomCode
+        });
+      }
+      // Renew Redis TTL once at the end of each stroke
+      socket.emit("draw_end", { roomCode });
+    }
   };
 
   const clearMyDrawing = () => {
@@ -192,7 +235,7 @@ export default function Draw({ onClose, identity }) {
     
     // 3. Tell the other user to erase MY lines from their screen too
     if (socket) {
-      socket.emit("draw_clear", { sender: identity });
+      socket.emit("draw_clear", { sender: identity, roomCode });
     }
   };
 

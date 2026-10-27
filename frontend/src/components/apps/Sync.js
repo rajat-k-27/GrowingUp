@@ -6,7 +6,7 @@ import { PlayCircle, Link as LinkIcon, Pause, Play, Volume2 } from "lucide-react
 import { useSocket } from "../SocketProvider";
 import ReactPlayer from "react-player";
 
-export default function Sync({ onClose, identity }) {
+export default function Sync({ onClose, identity, roomCode }) {
   const { socket } = useSocket();
   const [url, setUrl] = useState("");
   const [inputUrl, setInputUrl] = useState("");
@@ -52,11 +52,19 @@ export default function Sync({ onClose, identity }) {
       }
     };
 
+    const fetchSyncState = () => {
+      socket.emit("get_sync_state", roomCode);
+    };
+
     socket.on("sync_state", handleSyncState);
-    socket.emit("get_sync_state");
+    socket.on("connect", fetchSyncState);
+    fetchSyncState();
     
-    return () => socket.off("sync_state", handleSyncState);
-  }, [socket, url, isReady]);
+    return () => {
+      socket.off("sync_state", handleSyncState);
+      socket.off("connect", fetchSyncState);
+    };
+  }, [socket, url, isReady, roomCode]);
 
   // 2. Load Video
   const handleLoad = (e) => {
@@ -85,7 +93,7 @@ export default function Sync({ onClose, identity }) {
     setIsReady(false);
     
     if (socket) {
-      socket.emit("sync_update", { url: finalUrl, playing: false, playedSeconds: 0 });
+      socket.emit("sync_update", { url: finalUrl, playing: false, playedSeconds: 0, roomCode });
     }
   };
 
@@ -95,7 +103,7 @@ export default function Sync({ onClose, identity }) {
       isPlayingRef.current = true;
       setPlaying(true);
       if (socket) {
-        socket.emit("sync_update", { url, playing: true, playedSeconds: playerRef.current?.getCurrentTime() || 0 });
+        socket.emit("sync_update", { url, playing: true, playedSeconds: playerRef.current?.getCurrentTime() || 0, roomCode });
       }
     }
   };
@@ -105,7 +113,7 @@ export default function Sync({ onClose, identity }) {
       isPlayingRef.current = false;
       setPlaying(false);
       if (socket) {
-        socket.emit("sync_update", { url, playing: false, playedSeconds: playerRef.current?.getCurrentTime() || 0 });
+        socket.emit("sync_update", { url, playing: false, playedSeconds: playerRef.current?.getCurrentTime() || 0, roomCode });
       }
     }
   };
@@ -130,7 +138,7 @@ export default function Sync({ onClose, identity }) {
     isSeeking.current = false;
     const time = parseFloat(e.target.value);
     if (socket) {
-      socket.emit("sync_update", { url, playing, playedSeconds: time });
+      socket.emit("sync_update", { url, playing, playedSeconds: time, roomCode });
     }
   };
 
@@ -141,7 +149,7 @@ export default function Sync({ onClose, identity }) {
     
     setPlayedSeconds(seconds);
     if (socket) {
-      socket.emit("sync_update", { url, playing, playedSeconds: seconds });
+      socket.emit("sync_update", { url, playing, playedSeconds: seconds, roomCode });
     }
   };
 
@@ -153,7 +161,7 @@ export default function Sync({ onClose, identity }) {
       // If time jumps by more than 2 seconds, it was a manual native scrub!
       if (Math.abs(state.playedSeconds - lastProgressTime.current) > 2) {
         if (socket) {
-          socket.emit("sync_update", { url, playing, playedSeconds: state.playedSeconds });
+          socket.emit("sync_update", { url, playing, playedSeconds: state.playedSeconds, roomCode });
         }
       }
       

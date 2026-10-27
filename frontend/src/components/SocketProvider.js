@@ -24,11 +24,22 @@ export const SocketProvider = ({ children }) => {
     // Pass the secure token during handshake and force websocket for instant connection
     const socketInstance = io(backendUrl, {
       auth: { token },
-      transports: ["websocket"]
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
     });
 
     socketInstance.on("connect", () => setIsConnected(true));
-    socketInstance.on("disconnect", () => setIsConnected(false));
+    socketInstance.on("disconnect", (reason) => {
+      console.warn("Socket disconnected:", reason);
+      setIsConnected(false);
+    });
+    socketInstance.on("connect_error", (err) => {
+      console.warn("Socket connection error:", err.message);
+    });
 
     setSocket(socketInstance);
   };

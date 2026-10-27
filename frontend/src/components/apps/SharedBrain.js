@@ -6,7 +6,7 @@ import Window from "../Window";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSocket } from "../SocketProvider";
 
-export default function SharedBrain({ onClose, identity, roomCreator }) {
+export default function SharedBrain({ onClose, identity, roomCreator, roomCode }) {
   const { socket } = useSocket();
   const [expenses, setExpenses] = useState([]);
   const [title, setTitle] = useState("");
@@ -31,9 +31,9 @@ export default function SharedBrain({ onClose, identity, roomCreator }) {
     if (!socket) return;
     
     const fetchInit = () => {
-      socket.emit("getLedgerHistory");
-      socket.emit("getRoomUsers");
-      socket.emit("getRoomMembers");
+      socket.emit("getLedgerHistory", roomCode);
+      socket.emit("getRoomUsers", roomCode);
+      socket.emit("getRoomMembers", roomCode);
     };
 
     if (socket.connected) fetchInit();
@@ -73,7 +73,7 @@ export default function SharedBrain({ onClose, identity, roomCreator }) {
       socket.off("roomUsers");
       socket.off("roomMembers");
     };
-  }, [socket]);
+  }, [socket, roomCode]);
 
   // Calculations only for UNSETTLED debts
   const involvedExpenses = expenses.filter(exp => {
@@ -176,7 +176,8 @@ export default function SharedBrain({ onClose, identity, roomCreator }) {
       title: title.trim(), 
       amount: parseFloat(amount), 
       paidBy: identity,
-      splitWith: splitWithSelection
+      splitWith: splitWithSelection,
+      roomCode
     };
     
     socket.emit("createExpense", expData);
@@ -186,7 +187,7 @@ export default function SharedBrain({ onClose, identity, roomCreator }) {
   };
 
   const handleSettle = () => {
-    socket.emit("settleDebts");
+    socket.emit("settleDebts", { roomCode });
     setShowSettleModal(false);
   };
 
@@ -197,16 +198,16 @@ export default function SharedBrain({ onClose, identity, roomCreator }) {
   };
 
   const saveEdit = (id) => {
-    socket.emit("editExpense", { id, title: editTitle, amount: parseFloat(editAmount) });
+    socket.emit("editExpense", { id, title: editTitle, amount: parseFloat(editAmount), roomCode });
     setEditingId(null);
   };
 
   const handleDelete = (id) => {
-    socket.emit("deleteExpense", id);
+    socket.emit("deleteExpense", { id, roomCode });
   };
 
   const handleSettleExpense = (id) => {
-    socket.emit("settleExpense", id);
+    socket.emit("settleExpense", { id, roomCode });
   };
 
   return (
@@ -451,7 +452,7 @@ export default function SharedBrain({ onClose, identity, roomCreator }) {
                             </span>
                           ) : (
                             <button 
-                              onClick={() => socket.emit("markExpensePaid", exp._id)} 
+                              onClick={() => socket.emit("markExpensePaid", { id: exp._id, roomCode })} 
                               className="text-[10px] bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-white border border-green-500/50 px-4 py-1.5 rounded-lg transition-all font-black tracking-widest shadow-[0_0_15px_rgba(74,222,128,0.3)] active:scale-95"
                             >
                               I PAID

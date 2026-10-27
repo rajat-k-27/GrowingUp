@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useSocket } from "./SocketProvider";
 import { AlertTriangle, X } from "lucide-react";
 
-export default function PingModal({ onClose, identity }) {
+export default function PingModal({ onClose, identity, roomCode }) {
   const { socket } = useSocket();
 
   const pingReasons = [
@@ -20,7 +20,7 @@ export default function PingModal({ onClose, identity }) {
 
   const handlePing = (reason) => {
     if (socket) {
-      socket.emit("pingBro", { identity, reason });
+      socket.emit("pingBro", { identity, reason, roomCode });
     }
     onClose();
   };

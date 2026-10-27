@@ -6,7 +6,7 @@ import { useSocket } from "../SocketProvider";
 import toast from "react-hot-toast";
 import ConfirmModal from "../ConfirmModal";
 
-export default function Achievements({ onClose, identity }) {
+export default function Achievements({ onClose, identity, roomCode }) {
   const { socket } = useSocket();
 
   const [achievements, setAchievements] = useState([]);
@@ -54,20 +54,26 @@ export default function Achievements({ onClose, identity }) {
       setAchievements(prev => prev.filter(a => a.id !== id));
     };
 
+    const fetchAchievements = () => {
+      socket.emit("getAchievements", roomCode);
+    };
+
     socket.on("newAchievement", handleNewAchievement);
     socket.on("newAchievementCreated", handleNewAchievementCreated);
     socket.on("achievementsList", handleAchievementsList);
     socket.on("achievementDeleted", handleAchievementDeleted);
+    socket.on("connect", fetchAchievements);
     
-    socket.emit("getAchievements");
+    fetchAchievements();
 
     return () => {
       socket.off("newAchievement", handleNewAchievement);
       socket.off("newAchievementCreated", handleNewAchievementCreated);
       socket.off("achievementsList", handleAchievementsList);
       socket.off("achievementDeleted", handleAchievementDeleted);
+      socket.off("connect", fetchAchievements);
     };
-  }, [socket]);
+  }, [socket, roomCode]);
 
   const handleUnlock = (id) => {
     if (!socket) return;
@@ -90,7 +96,7 @@ export default function Achievements({ onClose, identity }) {
       setAchievements(prev => prev.map(a => 
         a.id === id ? { ...a, unlocked: newUnlockedState, unlockedBy: newUnlockedBy } : a
       ));
-      socket.emit("unlockAchievement", { id, unlocked: newUnlockedState, unlockedBy: newUnlockedBy });
+      socket.emit("unlockAchievement", { id, unlocked: newUnlockedState, unlockedBy: newUnlockedBy, roomCode });
     }
   };
 
@@ -108,7 +114,8 @@ export default function Achievements({ onClose, identity }) {
       title: newTitle.trim().toUpperCase(),
       desc: newDesc.trim(),
       unlocked: false,
-      unlockedBy: null
+      unlockedBy: null,
+      roomCode
     };
 
     socket.emit("createAchievement", newAch);
@@ -202,7 +209,7 @@ export default function Achievements({ onClose, identity }) {
         onClose={() => setDeleteConfirmId(null)}
         onConfirm={() => {
           if (socket && deleteConfirmId) {
-            socket.emit("deleteAchievement", deleteConfirmId);
+            socket.emit("deleteAchievement", { id: deleteConfirmId, roomCode });
             setAchievements(prev => prev.filter(a => a.id !== deleteConfirmId));
           }
         }}

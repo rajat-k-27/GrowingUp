@@ -6,7 +6,7 @@ import { useSocket } from "./SocketProvider";
 import { Camera, Type, Mic, Image as ImageIcon, Zap, X } from "lucide-react";
 import toast from "react-hot-toast";
 
-export default function DropModal({ onClose, identity }) {
+export default function DropModal({ onClose, identity, roomCode }) {
   const { socket } = useSocket();
   const [selectedType, setSelectedType] = useState(null);
   const [text, setText] = useState("");
@@ -78,7 +78,8 @@ export default function DropModal({ onClose, identity }) {
       identity, 
       type: selectedType || "THOUGHT", 
       content: text, 
-      mediaBase64 
+      mediaBase64,
+      roomCode
     });
     // We can close immediately, the server handles the upload
     onClose();

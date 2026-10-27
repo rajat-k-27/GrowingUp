@@ -114,7 +114,7 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
             </div>
 
             {/* Bro Wall */}
-            <BroWall identity={identity} />
+            <BroWall identity={identity} roomCode={roomCode} />
           </div>
 
         </div>
@@ -177,18 +177,18 @@ export default function Desktop({ identity, roomCode, onExitRoom }) {
           )}
         </AnimatePresence>
       {/* Windows rendering */}
-      {activeWindow === "BRAIN" && <SharedBrain onClose={() => setActiveWindow(null)} identity={identity} roomCreator={roomCreator} />}
-      {activeWindow === "MEMORIES" && <Memories onClose={() => setActiveWindow(null)} identity={identity} />}
-      {activeWindow === "SYNC" && <Sync onClose={() => setActiveWindow(null)} identity={identity} />}
-      {activeWindow === "DRAW" && <Draw onClose={() => setActiveWindow(null)} identity={identity} />}
-      {activeWindow === "ACHIEVEMENTS" && <Achievements onClose={() => setActiveWindow(null)} identity={identity} />}
-      {activeWindow === "SECRET" && <Secret onClose={() => setActiveWindow(null)} identity={identity} />}
-      {activeWindow === "CHAT" && <Chat onClose={() => setActiveWindow(null)} identity={identity} />}
+      {activeWindow === "BRAIN" && <SharedBrain onClose={() => setActiveWindow(null)} identity={identity} roomCreator={roomCreator} roomCode={roomCode} />}
+      {activeWindow === "MEMORIES" && <Memories onClose={() => setActiveWindow(null)} identity={identity} roomCode={roomCode} />}
+      {activeWindow === "SYNC" && <Sync onClose={() => setActiveWindow(null)} identity={identity} roomCode={roomCode} />}
+      {activeWindow === "DRAW" && <Draw onClose={() => setActiveWindow(null)} identity={identity} roomCode={roomCode} />}
+      {activeWindow === "ACHIEVEMENTS" && <Achievements onClose={() => setActiveWindow(null)} identity={identity} roomCode={roomCode} />}
+      {activeWindow === "SECRET" && <Secret onClose={() => setActiveWindow(null)} identity={identity} roomCode={roomCode} />}
+      {activeWindow === "CHAT" && <Chat onClose={() => setActiveWindow(null)} identity={identity} roomCode={roomCode} />}
       
       </div>
 
-      {showDrop && <DropModal onClose={() => setShowDrop(false)} identity={identity} />}
-      {showPing && <PingModal onClose={() => setShowPing(false)} identity={identity} />}
+      {showDrop && <DropModal onClose={() => setShowDrop(false)} identity={identity} roomCode={roomCode} />}
+      {showPing && <PingModal onClose={() => setShowPing(false)} identity={identity} roomCode={roomCode} />}
     </div>
   );
 }

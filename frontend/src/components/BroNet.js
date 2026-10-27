@@ -13,10 +13,12 @@ export default function BroNet({ identity, roomCode, onExitRoom }) {
   const [showModal, setShowModal] = useState(false);
   
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !roomCode) return;
     
     const handleConnect = () => {
       socket.emit("joinRoom", { username: identity, roomCode });
+      socket.emit("getRoomUsers", roomCode);
+      socket.emit("getRoomMembers", roomCode);
     };
 
     if (socket.connected) {
@@ -26,12 +28,16 @@ export default function BroNet({ identity, roomCode, onExitRoom }) {
     socket.on("connect", handleConnect);
 
     socket.on("roomUsers", (users) => {
-      // Filter ourselves out so we only show partners
-      setOnlinePartners(users.filter(u => u !== identity));
+      if (!Array.isArray(users)) return;
+      // Filter ourselves out case-insensitively so we only show partners
+      const normalizedIdentity = (identity || "").trim().toLowerCase();
+      setOnlinePartners(users.filter(u => u && u.trim().toLowerCase() !== normalizedIdentity));
     });
 
     socket.on("roomMembers", (members) => {
-      setAllMembers(members);
+      if (Array.isArray(members)) {
+        setAllMembers(members);
+      }
     });
 
     return () => {

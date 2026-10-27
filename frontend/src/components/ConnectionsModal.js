@@ -16,8 +16,8 @@ export default function ConnectionsModal({ onClose, identity, roomCode, partners
   };
 
   // Find offline members and remove any duplicates
-  const activeMembersSet = new Set([...partners, identity]);
-  const offlineMembers = Array.from(new Set(allMembers.filter(m => !activeMembersSet.has(m))));
+  const activeMembersSet = new Set([...(partners || []), identity].filter(Boolean).map(u => u.trim().toLowerCase()));
+  const offlineMembers = Array.from(new Set((allMembers || []).filter(m => m && !activeMembersSet.has(m.trim().toLowerCase()))));
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">

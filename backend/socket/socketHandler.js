@@ -28,36 +28,43 @@ module.exports = (io) => {
     console.log("A user connected:", socket.id);
 
     socket.on("joinRoom", async ({ username, roomCode }) => {
-      // Leave old room if exists
-      if (socket.roomCode && socket.username) {
+      if (!roomCode) return;
+      const targetRoom = roomCode.toString().trim().toUpperCase();
+
+      // Leave old room if exists and different
+      if (socket.roomCode && socket.roomCode !== targetRoom && socket.username) {
         socket.leave(socket.roomCode);
-        await redis.srem(`room:${socket.roomCode}`, socket.username);
-        const users = await redis.smembers(`room:${socket.roomCode}`);
+        await redis.srem(`room:${socket.roomCode}`, socket.username).catch(() => {});
+        const users = await redis.smembers(`room:${socket.roomCode}`).catch(() => []);
         io.to(socket.roomCode).emit("roomUsers", users);
       }
 
       socket.username = username;
-      socket.roomCode = roomCode || "DEFAULT";
-      socket.join(socket.roomCode);
+      socket.roomCode = targetRoom;
+      socket.join(targetRoom);
       
-      await redis.sadd(`room:${socket.roomCode}`, username);
-      const updatedUsers = await redis.smembers(`room:${socket.roomCode}`);
+      await redis.sadd(`room:${targetRoom}`, username).catch(() => {});
+      const updatedUsers = await redis.smembers(`room:${targetRoom}`).catch(() => [username]);
       
-      io.to(socket.roomCode).emit("roomUsers", updatedUsers);
+      io.to(targetRoom).emit("roomUsers", updatedUsers);
 
       try {
         const { RoomData } = require('../models');
-        // Use findOneAndUpdate with $addToSet to prevent VersionError on concurrent saves
+        // Use findOneAndUpdate with upsert so the room document is ALWAYS created/updated in MongoDB
         const room = await RoomData.findOneAndUpdate(
-          { code: socket.roomCode },
-          { $addToSet: { members: username } },
-          { new: true } // returns the updated document
+          { code: targetRoom },
+          { 
+            $addToSet: { members: username },
+            $setOnInsert: { name: `ROOM ${targetRoom}`, createdBy: username }
+          },
+          { new: true, upsert: true }
         );
         
-        if (room) {
-          if (room.members) {
-            io.to(socket.roomCode).emit("roomMembers", room.members);
-          }
+        if (room && room.members) {
+          io.to(targetRoom).emit("roomMembers", room.members);
+          socket.emit("roomMembers", room.members); // Immediate response to joining user
+        }
+        if (room && room.createdBy) {
           socket.emit("roomInfo", { createdBy: room.createdBy });
         }
       } catch (e) { console.error("Error tracking room members", e); }
@@ -113,60 +120,71 @@ module.exports = (io) => {
       } catch(e) { console.error(e); }
     });
 
-    socket.on("getActivityHistory", async () => {
+    socket.on("getActivityHistory", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const cacheKey = `cache:activities:${socket.roomCode}`;
-        const cached = await redis.get(cacheKey);
+        const cacheKey = `cache:activities:${room}`;
+        const cached = await redis.get(cacheKey).catch(() => null);
         if (cached) return socket.emit("activityHistory", JSON.parse(cached));
 
-        const history = await ActivityData.find({ roomCode: socket.roomCode }).sort({ createdAt: -1 }).limit(50).lean();
-        await redis.set(cacheKey, JSON.stringify(history), 'EX', 60);
+        const history = await ActivityData.find({ roomCode: room }).sort({ createdAt: -1 }).limit(50).lean();
+        await redis.set(cacheKey, JSON.stringify(history), 'EX', 60).catch(() => {});
         socket.emit("activityHistory", history);
       } catch(e) { console.error(e); }
     });
 
-    socket.on("getChatHistory", async () => {
+    socket.on("getChatHistory", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const cacheKey = `cache:chats:${socket.roomCode}`;
-        const cached = await redis.get(cacheKey);
+        const cacheKey = `cache:chats:${room}`;
+        const cached = await redis.get(cacheKey).catch(() => null);
         if (cached) return socket.emit("chatHistory", JSON.parse(cached));
 
-        const history = await ChatMessage.find({ roomCode: socket.roomCode }).sort({ createdAt: 1 }).limit(100).lean();
-        await redis.set(cacheKey, JSON.stringify(history), 'EX', 60);
+        const history = await ChatMessage.find({ roomCode: room }).sort({ createdAt: 1 }).limit(100).lean();
+        await redis.set(cacheKey, JSON.stringify(history), 'EX', 60).catch(() => {});
         socket.emit("chatHistory", history);
       } catch(e) { console.error(e); }
     });
 
-    socket.on("getSecretHistory", async (pin) => {
+    socket.on("getSecretHistory", async (data) => {
+      const pin = typeof data === 'object' ? data.pin : data;
+      const room = typeof data === 'object' && data.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const history = await SecretData.find({ roomCode: socket.roomCode, pin }).sort({ createdAt: 1 }).lean();
+        const history = await SecretData.find({ roomCode: room, pin }).sort({ createdAt: 1 }).lean();
         socket.emit("secretHistory", { pin, history });
       } catch(e) { console.error(e); }
     });
 
-    socket.on("getAchievements", async () => {
+    socket.on("getAchievements", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const cacheKey = `cache:achievements:${socket.roomCode}`;
-        const cached = await redis.get(cacheKey);
+        const cacheKey = `cache:achievements:${room}`;
+        const cached = await redis.get(cacheKey).catch(() => null);
         if (cached) return socket.emit("achievementsList", JSON.parse(cached));
 
-        const history = await AchievementData.find({ roomCode: socket.roomCode }).sort({ createdAt: 1 }).lean();
-        await redis.set(cacheKey, JSON.stringify(history), 'EX', 120);
+        const history = await AchievementData.find({ roomCode: room }).sort({ createdAt: 1 }).lean();
+        await redis.set(cacheKey, JSON.stringify(history), 'EX', 120).catch(() => {});
         socket.emit("achievementsList", history);
       } catch(e) { console.error(e); }
     });
 
-    socket.on("getMemories", async () => {
+    socket.on("getMemories", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const cacheKey = `cache:memories:${socket.roomCode}`;
-        const cached = await redis.get(cacheKey);
+        const cacheKey = `cache:memories:${room}`;
+        const cached = await redis.get(cacheKey).catch(() => null);
         if (cached) return socket.emit("memoriesList", JSON.parse(cached));
 
-        const history = await MemoryData.find({ roomCode: socket.roomCode })
+        const history = await MemoryData.find({ roomCode: room })
           .sort({ createdAt: -1 })
           .limit(50)
           .lean();
-        await redis.set(cacheKey, JSON.stringify(history), 'EX', 120);
+        await redis.set(cacheKey, JSON.stringify(history), 'EX', 120).catch(() => {});
         socket.emit("memoriesList", history);
       } catch(e) { console.error(e); }
     });
@@ -174,18 +192,19 @@ module.exports = (io) => {
     socket.on("leaveRoom", async () => {
       if (socket.roomCode && socket.username) {
         socket.leave(socket.roomCode);
-        await redis.srem(`room:${socket.roomCode}`, socket.username);
-        const users = await redis.smembers(`room:${socket.roomCode}`);
+        await redis.srem(`room:${socket.roomCode}`, socket.username).catch(() => {});
+        const users = await redis.smembers(`room:${socket.roomCode}`).catch(() => []);
         io.to(socket.roomCode).emit("roomUsers", users);
         socket.roomCode = null;
       }
     });
 
-    const logActivity = async (text, sender, type, mediaUrl = null, mediaType = null) => {
-      if (!socket.roomCode) return null;
+    const logActivity = async (text, sender, type, mediaUrl = null, mediaType = null, roomCode = null) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return null;
       try {
         const act = await ActivityData.create({
-          roomCode: socket.roomCode,
+          roomCode: room,
           sender,
           text,
           type,
@@ -195,17 +214,22 @@ module.exports = (io) => {
         });
         
         // Invalidate activity cache!
-        await redis.del(`cache:activities:${socket.roomCode}`);
+        await redis.del(`cache:activities:${room}`).catch(() => {});
         return act;
       } catch(e) { console.error(e); return null; }
     };
 
     socket.on("setStatus", async (data) => {
-      io.to(socket.roomCode).emit("statusUpdate", data);
-      await logActivity(`Status changed: "${data.status}"`, data.identity, "status");
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
+      io.to(room).emit("statusUpdate", data);
+      await logActivity(`Status changed: "${data.status}"`, data.identity, "status", null, null, room);
     });
 
     socket.on("sendDrop", async (data) => {
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
+
       let mediaUrl = null;
       let mediaType = null;
       
@@ -231,12 +255,14 @@ module.exports = (io) => {
       }
 
       const displayContent = data.content ? `: "${data.content}"` : "";
-      const act = await logActivity(`Dropped a ${data.type.toLowerCase()}${displayContent}`, data.identity, "drop", mediaUrl, mediaType);
+      const act = await logActivity(`Dropped a ${data.type.toLowerCase()}${displayContent}`, data.identity, "drop", mediaUrl, mediaType, room);
       
-      io.to(socket.roomCode).emit("newDrop", { ...data, _id: act?._id, mediaUrl, mediaType, time: act?.time || new Date().toLocaleTimeString(), createdAt: act?.createdAt || new Date() });
+      io.to(room).emit("newDrop", { ...data, _id: act?._id, mediaUrl, mediaType, time: act?.time || new Date().toLocaleTimeString(), createdAt: act?.createdAt || new Date() });
     });
 
-    socket.on("deleteDrop", async (id) => {
+    socket.on("deleteDrop", async (data) => {
+      const id = typeof data === 'object' ? data.id : data;
+      const room = typeof data === 'object' && data.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
       try {
         const act = await ActivityData.findById(id);
         if (act && act.mediaUrl && act.mediaUrl.includes("cloudinary.com")) {
@@ -248,26 +274,35 @@ module.exports = (io) => {
         }
 
         await ActivityData.findByIdAndDelete(id);
-        await redis.del(`cache:activities:${socket.roomCode}`);
-        io.to(socket.roomCode).emit("dropDeleted", id);
+        if (room) {
+          await redis.del(`cache:activities:${room}`).catch(() => {});
+          io.to(room).emit("dropDeleted", id);
+        }
       } catch (e) {
         console.error(e);
       }
     });
 
     socket.on("pingBro", async (data) => {
-      io.to(socket.roomCode).emit("newPing", data);
-      await logActivity(`Pinged: "${data.reason}"`, data.identity, "ping");
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
+      io.to(room).emit("newPing", data);
+      await logActivity(`Pinged: "${data.reason}"`, data.identity, "ping", null, null, room);
     });
 
     socket.on("imHere", async (data) => {
-      io.to(socket.roomCode).emit("hereUpdate", data);
-      await logActivity("I'm Here ❤️", data.identity, "here");
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
+      io.to(room).emit("hereUpdate", data);
+      await logActivity("I'm Here ❤️", data.identity, "here", null, null, room);
     });
 
     socket.on("chatMessage", async (data) => {
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
+
       // Apply Rate Limiting (Max 5 messages per 2 seconds)
-      if (!await checkRateLimit(socket.user.username, 'chat', 5, 2)) {
+      if (socket.user && !await checkRateLimit(socket.user.username, 'chat', 5, 2)) {
         console.warn(`Rate limit triggered for ${socket.user.username} on chatMessage`);
         return; // Silently drop the spam message
       }
@@ -301,74 +336,96 @@ module.exports = (io) => {
 
       data.createdAt = new Date();
       data.time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      io.to(socket.roomCode).emit("newChatMessage", data);
+      io.to(room).emit("newChatMessage", data);
       try {
         const { id, ...dbData } = data;
-        await ChatMessage.create({ ...dbData, roomCode: socket.roomCode });
+        await ChatMessage.create({ ...dbData, roomCode: room });
         
         // Invalidate chat cache!
-        await redis.del(`cache:chats:${socket.roomCode}`);
+        await redis.del(`cache:chats:${room}`).catch(() => {});
       } catch(e) { console.error(e); }
     });
 
     socket.on("secretMessage", async (data) => {
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
         const { id, ...dbData } = data;
-        await SecretData.create({ ...dbData, roomCode: socket.roomCode });
+        await SecretData.create({ ...dbData, roomCode: room });
       } catch(e) { console.error(e); }
-      io.to(socket.roomCode).emit("newSecretMessage", data);
+      io.to(room).emit("newSecretMessage", data);
     });
 
     // DRAW EVENTS
     socket.on("draw_line", (data) => {
-      socket.to(socket.roomCode).emit("draw_line", data);
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
+      socket.to(room).emit("draw_line", data);
       
-      // Fire-and-forget Redis storage
-      redis.rpush(`draw:${socket.roomCode}`, JSON.stringify(data))
-        .then(() => redis.expire(`draw:${socket.roomCode}`, 86400))
-        .catch(() => {});
+      // Store vector line segment in Redis (NO repetitive expire per point)
+      redis.rpush(`draw:${room}`, JSON.stringify(data)).catch(() => {});
     });
 
-    socket.on("get_draw_state", async () => {
+    socket.on("draw_end", (data) => {
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (room) {
+        redis.expire(`draw:${room}`, 86400).catch(() => {});
+      }
+    });
+
+    socket.on("get_draw_state", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const lines = await redis.lrange(`draw:${socket.roomCode}`, 0, -1);
+        const lines = await redis.lrange(`draw:${room}`, 0, -1);
         if (lines && lines.length > 0) {
-          const parsedLines = lines.map(l => JSON.parse(l));
+          const parsedLines = lines.map(l => {
+            try { return JSON.parse(l); } catch(err) { return null; }
+          }).filter(Boolean);
           socket.emit("draw_state", parsedLines);
+        } else {
+          socket.emit("draw_state", []);
         }
-      } catch(e) {}
+      } catch(e) {
+        socket.emit("draw_state", []);
+      }
     });
 
     socket.on("draw_clear", (data) => {
-      socket.to(socket.roomCode).emit("draw_clear", data);
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
+      socket.to(room).emit("draw_clear", data);
       
-      // Fire-and-forget Redis storage
       if (data && data.sender) {
-        redis.lrange(`draw:${socket.roomCode}`, 0, -1).then(lines => {
-          const parsedLines = lines.map(l => JSON.parse(l)).filter(l => l.sender !== data.sender);
-          redis.del(`draw:${socket.roomCode}`).then(() => {
+        redis.lrange(`draw:${room}`, 0, -1).then(lines => {
+          const parsedLines = lines.map(l => {
+            try { return JSON.parse(l); } catch(err) { return null; }
+          }).filter(l => l && l.sender !== data.sender);
+          redis.del(`draw:${room}`).then(() => {
             if (parsedLines.length > 0) {
               const stringified = parsedLines.map(l => JSON.stringify(l));
-              redis.rpush(`draw:${socket.roomCode}`, ...stringified);
+              redis.rpush(`draw:${room}`, ...stringified).catch(() => {});
             }
-          });
+          }).catch(() => {});
         }).catch(() => {});
       } else {
-        redis.del(`draw:${socket.roomCode}`).catch(() => {});
+        redis.del(`draw:${room}`).catch(() => {});
       }
     });
 
     // SYNC EVENTS
     socket.on("sync_update", (data) => {
-      // Emit instantly for zero latency
-      socket.to(socket.roomCode).emit("sync_state", data);
-      // Save to Redis in background
-      redis.set(`sync:${socket.roomCode}`, JSON.stringify(data), 'EX', 86400).catch(e => console.error(e));
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
+      socket.to(room).emit("sync_state", data);
+      redis.set(`sync:${room}`, JSON.stringify(data), 'EX', 86400).catch(() => {});
     });
 
-    socket.on("get_sync_state", async () => {
+    socket.on("get_sync_state", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const stateStr = await redis.get(`sync:${socket.roomCode}`);
+        const stateStr = await redis.get(`sync:${room}`);
         if (stateStr) {
           socket.emit("sync_state", JSON.parse(stateStr));
         }
@@ -376,38 +433,46 @@ module.exports = (io) => {
     });
 
     socket.on("unlockAchievement", async (data) => {
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
         await AchievementData.findOneAndUpdate(
-          { id: data.id, roomCode: socket.roomCode }, 
-          { unlocked: data.unlocked, unlockedBy: data.unlockedBy, roomCode: socket.roomCode },
+          { id: data.id, roomCode: room }, 
+          { unlocked: data.unlocked, unlockedBy: data.unlockedBy, roomCode: room },
           { upsert: true }
         );
-        await redis.del(`cache:achievements:${socket.roomCode}`);
+        await redis.del(`cache:achievements:${room}`).catch(() => {});
       } catch(e) { console.error(e); }
-      io.to(socket.roomCode).emit("newAchievement", data);
+      io.to(room).emit("newAchievement", data);
     });
 
     socket.on("createAchievement", async (data) => {
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
         await AchievementData.findOneAndUpdate(
-          { id: data.id, roomCode: socket.roomCode },
-          { ...data, roomCode: socket.roomCode },
+          { id: data.id, roomCode: room },
+          { ...data, roomCode: room },
           { upsert: true }
         );
-        await redis.del(`cache:achievements:${socket.roomCode}`);
+        await redis.del(`cache:achievements:${room}`).catch(() => {});
       } catch(e) { console.error(e); }
-      io.to(socket.roomCode).emit("newAchievementCreated", data);
+      io.to(room).emit("newAchievementCreated", data);
     });
 
-    socket.on("deleteAchievement", async (id) => {
+    socket.on("deleteAchievement", async (data) => {
+      const id = typeof data === 'object' ? data.id : data;
+      const room = typeof data === 'object' && data.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
       try {
-        await AchievementData.findOneAndDelete({ id: id, roomCode: socket.roomCode });
-        await redis.del(`cache:achievements:${socket.roomCode}`);
+        await AchievementData.findOneAndDelete({ id: id, roomCode: room });
+        if (room) await redis.del(`cache:achievements:${room}`).catch(() => {});
+        io.to(room).emit("achievementDeleted", id);
       } catch(e) { console.error(e); }
-      io.to(socket.roomCode).emit("achievementDeleted", id);
     });
 
     socket.on("createMemory", async (data) => {
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
         if (data.image && data.image.startsWith("data:image")) {
           try {
@@ -424,15 +489,17 @@ module.exports = (io) => {
             console.error("Cloudinary Error:", cloudErr);
           }
         }
-        await MemoryData.create({ ...data, roomCode: socket.roomCode });
-        await redis.del(`cache:memories:${socket.roomCode}`);
+        await MemoryData.create({ ...data, roomCode: room });
+        await redis.del(`cache:memories:${room}`).catch(() => {});
       } catch(e) { console.error("Mongo Error:", e); }
-      io.to(socket.roomCode).emit("newMemory", data);
+      io.to(room).emit("newMemory", data);
     });
 
-    socket.on("deleteMemory", async (id) => {
+    socket.on("deleteMemory", async (data) => {
+      const id = typeof data === 'object' ? data.id : data;
+      const room = typeof data === 'object' && data.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
       try {
-        const mem = await MemoryData.findOne({ id: id, roomCode: socket.roomCode });
+        const mem = await MemoryData.findOne({ id: id, roomCode: room });
         if (mem && mem.image && mem.image.includes("cloudinary.com")) {
           const parts = mem.image.split("/");
           const filePart = parts[parts.length - 1];
@@ -441,94 +508,118 @@ module.exports = (io) => {
           cloudinary.uploader.destroy(publicId).catch(e => console.error("Cloudinary delete error:", e));
         }
 
-        await MemoryData.findOneAndDelete({ id: id, roomCode: socket.roomCode });
-        await redis.del(`cache:memories:${socket.roomCode}`);
-        io.to(socket.roomCode).emit("memoryDeleted", id);
+        await MemoryData.findOneAndDelete({ id: id, roomCode: room });
+        if (room) await redis.del(`cache:memories:${room}`).catch(() => {});
+        io.to(room).emit("memoryDeleted", id);
       } catch (e) {
         console.error(e);
       }
     });
-    socket.on("getLedgerHistory", async () => {
+
+    socket.on("getLedgerHistory", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const history = await Expense.find({ roomCode: socket.roomCode }).sort({ createdAt: -1 }).lean();
+        const history = await Expense.find({ roomCode: room }).sort({ createdAt: -1 }).lean();
         socket.emit("ledgerHistory", history);
       } catch (e) { console.error(e); }
     });
 
-    socket.on("getRoomUsers", async () => {
-      if (socket.roomCode) {
-        const users = await redis.smembers(`room:${socket.roomCode}`);
-        socket.emit("roomUsers", users);
+    socket.on("getRoomUsers", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (room) {
+        try {
+          const users = await redis.smembers(`room:${room}`);
+          socket.emit("roomUsers", users);
+        } catch (e) {
+          socket.emit("roomUsers", socket.username ? [socket.username] : []);
+        }
       }
     });
 
-    socket.on("getRoomMembers", async () => {
-      try {
-        const { RoomData } = require('../models');
-        const room = await RoomData.findOne({ code: socket.roomCode }).lean();
-        if (room && room.members) {
-          socket.emit("roomMembers", room.members);
-        }
-      } catch (e) { console.error(e); }
+    socket.on("getRoomMembers", async (roomCode) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (room) {
+        try {
+          const { RoomData } = require('../models');
+          const roomDoc = await RoomData.findOne({ code: room }).lean();
+          if (roomDoc && roomDoc.members) {
+            socket.emit("roomMembers", roomDoc.members);
+          }
+        } catch (e) { console.error(e); }
+      }
     });
 
     socket.on("createExpense", async (data) => {
+      const room = data?.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
+      if (!room) return;
       try {
-        const newExp = await Expense.create({ ...data, roomCode: socket.roomCode });
-        io.to(socket.roomCode).emit("newExpense", newExp);
+        const newExp = await Expense.create({ ...data, roomCode: room });
+        io.to(room).emit("newExpense", newExp);
       } catch(e) { console.error(e); }
     });
 
-    socket.on("deleteExpense", async (id) => {
+    socket.on("deleteExpense", async (data) => {
+      const id = typeof data === 'object' ? data.id : data;
+      const room = typeof data === 'object' && data.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
       try {
         await Expense.findByIdAndDelete(id);
-        io.to(socket.roomCode).emit("expenseDeleted", id);
+        io.to(room || socket.roomCode).emit("expenseDeleted", id);
       } catch(e) { console.error(e); }
     });
 
-    socket.on("editExpense", async ({ id, title, amount }) => {
+    socket.on("editExpense", async ({ id, title, amount, roomCode }) => {
+      const room = roomCode ? roomCode.toString().trim().toUpperCase() : socket.roomCode;
       try {
         const exp = await Expense.findByIdAndUpdate(id, { title, amount }, { new: true });
-        io.to(socket.roomCode).emit("expenseUpdated", exp);
+        io.to(room).emit("expenseUpdated", exp);
       } catch(e) { console.error(e); }
     });
 
-    socket.on("settleExpense", async (id) => {
+    socket.on("settleExpense", async (data) => {
+      const id = typeof data === 'object' ? data.id : data;
+      const room = typeof data === 'object' && data.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
       try {
         const exp = await Expense.findByIdAndUpdate(id, { settled: true }, { new: true });
-        io.to(socket.roomCode).emit("expenseUpdated", exp);
+        io.to(room).emit("expenseUpdated", exp);
         
         // Also emit ledgerHistory to update balances
-        const history = await Expense.find({ roomCode: socket.roomCode }).sort({ createdAt: -1 }).lean();
-        io.to(socket.roomCode).emit("ledgerHistory", history);
+        const history = await Expense.find({ roomCode: room }).sort({ createdAt: -1 }).lean();
+        io.to(room).emit("ledgerHistory", history);
       } catch(e) { console.error(e); }
     });
 
-    socket.on("markExpensePaid", async (id) => {
+    socket.on("markExpensePaid", async (data) => {
+      const id = typeof data === 'object' ? data.id : data;
+      const room = typeof data === 'object' && data.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
       try {
         const exp = await Expense.findByIdAndUpdate(
           id, 
           { $addToSet: { markedPaidBy: socket.username } }, 
           { new: true }
         );
-        io.to(socket.roomCode).emit("expenseUpdated", exp);
+        io.to(room).emit("expenseUpdated", exp);
       } catch(e) { console.error(e); }
     });
 
-    socket.on("settleDebts", async () => {
+    socket.on("settleDebts", async (data) => {
+      const room = typeof data === 'object' && data.roomCode ? data.roomCode.toString().trim().toUpperCase() : socket.roomCode;
       try {
-        await Expense.updateMany({ roomCode: socket.roomCode, paidBy: socket.username, settled: false }, { settled: true });
-        const history = await Expense.find({ roomCode: socket.roomCode }).sort({ createdAt: -1 }).lean();
-        io.to(socket.roomCode).emit("ledgerHistory", history);
+        await Expense.updateMany({ roomCode: room, paidBy: socket.username, settled: false }, { settled: true });
+        const history = await Expense.find({ roomCode: room }).sort({ createdAt: -1 }).lean();
+        io.to(room).emit("ledgerHistory", history);
       } catch(e) { console.error(e); }
     });
-
 
     socket.on("disconnect", async () => {
       if (socket.roomCode && socket.username) {
-        await redis.srem(`room:${socket.roomCode}`, socket.username);
-        const users = await redis.smembers(`room:${socket.roomCode}`);
-        io.to(socket.roomCode).emit("roomUsers", users);
+        try {
+          await redis.srem(`room:${socket.roomCode}`, socket.username);
+          const users = await redis.smembers(`room:${socket.roomCode}`);
+          io.to(socket.roomCode).emit("roomUsers", users);
+        } catch (err) {
+          console.error("Redis disconnect error:", err);
+        }
       }
       console.log("Client disconnected:", socket.id);
     });

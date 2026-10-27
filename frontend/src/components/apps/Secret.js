@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSocket } from "../SocketProvider";
 import toast from "react-hot-toast";
 
-export default function Secret({ onClose, identity }) {
+export default function Secret({ onClose, identity, roomCode }) {
   const { socket } = useSocket();
 
   const [password, setPassword] = useState("");
@@ -31,19 +31,25 @@ export default function Secret({ onClose, identity }) {
         setSecrets(data.history);
       }
     };
+
+    const fetchSecrets = () => {
+      if (unlocked && currentPin) {
+        socket.emit("getSecretHistory", { pin: currentPin, roomCode });
+      }
+    };
     
     socket.on("newSecretMessage", handleNewSecret);
     socket.on("secretHistory", handleSecretHistory);
+    socket.on("connect", fetchSecrets);
     
-    if (unlocked && currentPin) {
-      socket.emit("getSecretHistory", currentPin);
-    }
+    fetchSecrets();
 
     return () => {
       socket.off("newSecretMessage", handleNewSecret);
       socket.off("secretHistory", handleSecretHistory);
+      socket.off("connect", fetchSecrets);
     };
-  }, [socket, unlocked, currentPin]);
+  }, [socket, unlocked, currentPin, roomCode]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -69,7 +75,7 @@ export default function Secret({ onClose, identity }) {
       toast.error("CANNOT SEND EMPTY MESSAGE");
       return;
     }
-    const newSecret = { id: Date.now(), sender: identity, text: input, timestamp: new Date().toLocaleTimeString(), pin: currentPin };
+    const newSecret = { id: Date.now(), sender: identity, text: input, timestamp: new Date().toLocaleTimeString(), pin: currentPin, roomCode };
     socket.emit("secretMessage", newSecret);
     setInput("");
   };

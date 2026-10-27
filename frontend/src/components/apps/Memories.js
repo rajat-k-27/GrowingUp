@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import ImageViewer from "../ImageViewer";
 import ConfirmModal from "../ConfirmModal";
 
-export default function Memories({ onClose, identity }) {
+export default function Memories({ onClose, identity, roomCode }) {
   const { socket } = useSocket();
   const [memories, setMemories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +44,7 @@ export default function Memories({ onClose, identity }) {
     };
     
     const fetchInit = () => {
-      socket.emit("getMemories");
+      socket.emit("getMemories", roomCode);
     };
 
     if (socket.connected) fetchInit();
@@ -60,7 +60,7 @@ export default function Memories({ onClose, identity }) {
       socket.off("memoriesList", handleMemoriesList);
       socket.off("memoryDeleted", handleMemoryDeleted);
     };
-  }, [socket]);
+  }, [socket, roomCode]);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -117,7 +117,8 @@ export default function Memories({ onClose, identity }) {
       description: desc,
       image: imageStr,
       date: now.toLocaleDateString(),
-      time: now.toLocaleTimeString()
+      time: now.toLocaleTimeString(),
+      roomCode
     };
 
     socket.emit("createMemory", newMem);
@@ -238,7 +239,7 @@ export default function Memories({ onClose, identity }) {
         onClose={() => setDeleteConfirmId(null)}
         onConfirm={() => {
           if (socket && deleteConfirmId) {
-            socket.emit("deleteMemory", deleteConfirmId);
+            socket.emit("deleteMemory", { id: deleteConfirmId, roomCode });
           }
         }}
         title="DELETE MEMORY"
