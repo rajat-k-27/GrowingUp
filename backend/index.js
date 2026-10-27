@@ -26,9 +26,12 @@ const io = new Server(server, {
   cors: {
     origin: '*',
   },
-  maxHttpBufferSize: 5e6, // 5MB limit
-  pingInterval: 15000, // Send heartbeat every 15s to keep Render/Cloudflare proxy alive
-  pingTimeout: 10000 // 10s timeout for response
+  maxHttpBufferSize: 1e7, // 10MB limit
+  pingInterval: 20000,    // Send heartbeat every 20s (keeps Render/Cloudflare proxy alive)
+  pingTimeout: 120000,    // 2-minute timeout: prevents accidental drops when phone locks or network jitters
+  transports: ['websocket', 'polling'],
+  allowUpgrades: true,
+  connectTimeout: 45000
 });
 
 // Configure Redis Adapter for multi-instance scaling if explicitly requested

@@ -40,7 +40,7 @@ export const SocketProvider = ({ children }) => {
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000
+      timeout: 45000
     });
 
     socketInstance.on("connect", () => {
